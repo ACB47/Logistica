@@ -16,8 +16,13 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def utc_path_stamp(dt: datetime) -> str:
-    # yyyy/mm/dd/hhmm (micro-lote por minuto)
+def utc_local_stamp(dt: datetime) -> str:
+    # timestamp seguro para nombre de fichero local (sin "/")
+    return dt.strftime("%Y%m%d_%H%M")
+
+
+def utc_hdfs_stamp(dt: datetime) -> str:
+    # yyyy/mm/dd/hhmm (particionado por micro-lote en HDFS)
     return dt.strftime("%Y/%m/%d/%H%M")
 
 
@@ -45,6 +50,7 @@ def main() -> None:
     p.add_argument("--group-id", default="logistica-raw-sink")
     p.add_argument("--topics", default="datos_crudos,alertas_globales")
     p.add_argument("--spool-dir", default="/tmp/logistica_spool")
+    p.add_argument("--flush-every-sec", type=float, default=30.0, help="Volcar buffers a HDFS cada N segundos")
     args = p.parse_args()
 
     topics = [t.strip() for t in args.topics.split(",") if t.strip()]
@@ -62,9 +68,11 @@ def main() -> None:
         consumer_timeout_ms=1000,
     )
 
-    current_minute = utc_path_stamp(utc_now())
+    current_minute_local = utc_local_stamp(utc_now())
+    current_minute_hdfs = utc_hdfs_stamp(utc_now())
     open_files: dict[str, Path] = {}
     buffers: dict[str, list[str]] = {}
+    last_flush = time.time()
 
     def flush_and_ship() -> None:
         nonlocal open_files, buffers
@@ -81,7 +89,7 @@ def main() -> None:
             if not local_path.exists() or local_path.stat().st_size == 0:
                 continue
             # name puede ser ships/clima/noticias
-            hdfs_dir = f"/hadoop/logistica/raw/{name}/{current_minute}"
+            hdfs_dir = f"/hadoop/logistica/raw/{name}/{current_minute_hdfs}"
             hdfs_put(local_path, hdfs_dir)
             local_path.unlink(missing_ok=True)
 
@@ -93,16 +101,18 @@ def main() -> None:
             open_files[name] = local_path
             buffers.setdefault(name, [])
 
-    ensure_files(current_minute)
+    ensure_files(current_minute_local)
     print(f"Consumiendo topics={topics} bootstrap={args.bootstrap} -> HDFS raw. Spool={spool}")
 
     while True:
-        now_stamp = utc_path_stamp(utc_now())
-        if now_stamp != current_minute:
+        now_local = utc_local_stamp(utc_now())
+        now_hdfs = utc_hdfs_stamp(utc_now())
+        if now_hdfs != current_minute_hdfs:
             # rotación: sube el minuto anterior
             flush_and_ship()
-            current_minute = now_stamp
-            ensure_files(current_minute)
+            current_minute_local = now_local
+            current_minute_hdfs = now_hdfs
+            ensure_files(current_minute_local)
 
         got_any = False
         for msg in consumer:
@@ -125,10 +135,16 @@ def main() -> None:
             # flush por tamaño para no perder si se para
             if sum(len(v) for v in buffers.values()) >= 200:
                 flush_and_ship()
+                last_flush = time.time()
 
         # si no hay mensajes, duerme un poco
         if not got_any:
             time.sleep(0.5)
+
+        # flush periódico para que haya evidencia en pocos segundos
+        if time.time() - last_flush >= args.flush_every_sec:
+            flush_and_ship()
+            last_flush = time.time()
 
 
 if __name__ == "__main__":

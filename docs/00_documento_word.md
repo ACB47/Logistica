@@ -124,6 +124,63 @@ Rutas:
 
 > Nota: cómo se hace la copia “raw” depende de la herramienta final (NiFi/consumidores). Se documenta el mecanismo elegido.
 
+### 4.4 Ejecución end-to-end (producción + landing raw)
+
+Para tener evidencia en HDFS rápidamente, ejecutamos:
+- productor de **GPS barcos** → `datos_crudos`
+- productor de **alertas globales** (clima/noticias) → `alertas_globales`
+- consumidor que hace **landing raw** JSONL en HDFS
+
+**Paso 1: activar Kafka en `master`**
+
+```bash
+cd /home/hadoop/PROYECTOLOGISTICA
+source scripts/12_use_existing_kafka.sh
+```
+
+**Paso 2: crear entorno Python de ingesta**
+
+```bash
+cd /home/hadoop/PROYECTOLOGISTICA
+python3 -m venv .venv-ingesta
+source .venv-ingesta/bin/activate
+pip install -r ingesta/requirements.txt
+```
+
+**Paso 3: lanzar productores (2 terminales)**
+
+Terminal A (GPS barcos):
+```bash
+source .venv-ingesta/bin/activate
+python3 ingesta/productores/ships_gps_producer.py --bootstrap master:9092 --topic datos_crudos --ships 10 --interval-sec 0.5
+```
+
+Terminal B (alertas clima/noticias):
+```bash
+source .venv-ingesta/bin/activate
+python3 ingesta/productores/alerts_producer.py --bootstrap master:9092 --topic alertas_globales --interval-sec 1.0
+```
+
+**Paso 4: lanzar landing raw (3ª terminal)**
+
+```bash
+source .venv-ingesta/bin/activate
+python3 ingesta/consumidores/kafka_to_hdfs_raw.py --bootstrap master:9092 --group-id logistica-raw-sink \
+  --spool-dir /tmp/logistica_spool --flush-every-sec 30
+```
+
+**Paso 5: verificar que se genera la evidencia**
+
+```bash
+hdfs dfs -ls -R /hadoop/logistica/raw/ships | head
+hdfs dfs -ls -R /hadoop/logistica/raw/clima | head
+hdfs dfs -ls -R /hadoop/logistica/raw/noticias | head
+```
+
+**Capturas recomendadas**:
+- 3 terminales mostrando productores + consumidor activos.
+- salida de `hdfs dfs -ls -R ...` confirmando ficheros JSONL en `ships/`, `clima/` y `noticias/`.
+
 ---
 
 ## 5. Preprocesamiento y transformación (KDD – Preprocesamiento/Transformación): Spark SQL + Hive
@@ -137,6 +194,21 @@ Rutas:
 **Capturas**:
 - Ejecución de un job Spark en YARN.
 - Tabla staging en Hive.
+
+**Ejecución del job 01 (ejemplo)**:
+
+```bash
+cd /home/hadoop/PROYECTOLOGISTICA
+spark-submit --master yarn --deploy-mode client jobs/spark/01_raw_to_staging.py
+```
+
+**Verificación en HDFS (evidencia)**:
+
+```bash
+hdfs dfs -ls -R /hadoop/logistica/staging/stg_ships | head
+hdfs dfs -ls -R /hadoop/logistica/staging/stg_alerts_clima | head
+hdfs dfs -ls -R /hadoop/logistica/staging/stg_alerts_noticias | head
+```
 
 ### 5.2 Enriquecimiento con datos maestros (Hive)
 

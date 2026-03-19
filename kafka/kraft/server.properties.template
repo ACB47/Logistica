@@ -4,11 +4,12 @@ process.roles=broker,controller
 node.id=1
 
 # Directorio local para logs de Kafka (NO HDFS)
-log.dirs=/var/lib/kafka/logs
+# (Usamos una ruta escribible por el usuario para evitar sudo)
+log.dirs=/home/hadoop/kafka_logs
 
 ############################# Listeners #############################
-# Cambia <HOSTNAME> por master/slave01/slave02
-listeners=PLAINTEXT://<HOSTNAME>:9092,CONTROLLER://<HOSTNAME>:9093
+# Bind a todas las interfaces, pero anunciamos el hostname para el cliente
+listeners=PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
 advertised.listeners=PLAINTEXT://<HOSTNAME>:9092
 listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
 controller.listener.names=CONTROLLER
