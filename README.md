@@ -34,3 +34,21 @@ Este repositorio contiene la **guía paso a paso** y los **artefactos** para el 
 
 - Guion principal: `docs/00_documento_word.md`
 
+## Estado actual del proyecto (checkpoint)
+
+- Servicios base levantados: HDFS/YARN, Hive Metastore, Kafka KRaft (3 nodos), Airflow.
+- Pipeline KDD implementado (batch/micro-lote):
+  - `jobs/spark/01_raw_to_staging.py`
+  - `jobs/spark/02_graph_metrics.py`
+  - `jobs/spark/03_score_and_alert.py`
+- Tablas Hive verificadas:
+  - staging: `logistica.stg_ships`, `logistica.stg_alerts_clima`, `logistica.stg_alerts_noticias`
+  - curadas: `logistica.fact_route_risk`, `logistica.fact_graph_hops`, `logistica.fact_alerts`
+- Airflow operativo con DAG: `logistica_kdd_microbatch`.
+
+## Pendiente para cierre completo de entrega
+
+- Inyección con fuentes tipo API (o su emulación controlada) documentada de forma explícita.
+- Diseño/diagrama del flujo NiFi para ingestión y enrutado de eventos.
+- Completar documento Word con capturas finales (Airflow run, tablas Hive, flujo de ingesta y NiFi).
+

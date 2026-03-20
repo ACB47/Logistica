@@ -12,6 +12,24 @@ Este fichero es el **esqueleto** del documento Word. La idea es escribir aquí p
 
 ---
 
+## 0.1 Estado real de implementación (checkpoint)
+
+- Stack levantado en entorno de 3 VMs:
+  - Hadoop/HDFS + YARN
+  - Kafka KRaft (3 nodos)
+  - Hive Metastore
+  - Spark 3.5.x + GraphFrames
+  - Airflow 2.10.5
+- Jobs KDD implementados:
+  - `jobs/spark/01_raw_to_staging.py`
+  - `jobs/spark/02_graph_metrics.py`
+  - `jobs/spark/03_score_and_alert.py`
+- Tablas de salida verificadas:
+  - `logistica.stg_ships`, `logistica.stg_alerts_clima`, `logistica.stg_alerts_noticias`
+  - `logistica.fact_route_risk`, `logistica.fact_graph_hops`, `logistica.fact_alerts`
+
+---
+
 ## 1. Contexto y problema (KDD – Selección)
 
 ### 1.1 Sector y caso de uso
@@ -122,7 +140,9 @@ Rutas:
 - `hdfs dfs -mkdir -p ...`
 - `hdfs dfs -ls -R /hadoop/logistica/raw`
 
-> Nota: cómo se hace la copia “raw” depende de la herramienta final (NiFi/consumidores). Se documenta el mecanismo elegido.
+> Nota: cómo se hace la copia "raw" depende de la herramienta final (NiFi/consumidores). Se documenta el mecanismo elegido.
+> Estado actual: validado con productores Python + consumidor Kafka->HDFS.
+> Pendiente de cierre final: flujo equivalente con NiFi + conectores/API.
 
 ### 4.4 Ejecución end-to-end (producción + landing raw)
 
@@ -279,6 +299,27 @@ Requisitos rúbrica:
 **Capturas**:
 - Vista del DAG.
 - Ejecución correcta (verde) + ejemplo de reintento.
+
+### 8.2 Parámetros reales usados en esta entrega
+
+- `AIRFLOW_HOME`: `/home/hadoop/PROYECTOLOGISTICA/.airflow`
+- Usuario UI: `admin` / `admin`
+- DAG cargado: `logistica_kdd_microbatch`
+- Versión validada en entorno: `apache-airflow==2.10.5`
+
+### 8.3 NiFi (diseño a incluir en la memoria)
+
+Sección a completar con diagrama:
+- Fuente HTTP/API -> `InvokeHTTP`
+- Parseo/normalización -> `JoltTransformJSON` / `UpdateRecord`
+- Enrutado por tipo (`ships`, `clima`, `noticias`) -> `RouteOnAttribute`
+- Publicación a Kafka (`PublishKafkaRecord_2_0`) o landing directo a HDFS (`PutHDFS`)
+- Trazabilidad/errores -> colas de fallo + reintentos
+
+**Capturas previstas**:
+- Canvas de NiFi con processors conectados.
+- Config de al menos un `InvokeHTTP` y un `PublishKafkaRecord_2_0`/`PutHDFS`.
+- Evidencia de flujo en cola/success.
 
 ---
 
