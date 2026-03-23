@@ -6,25 +6,23 @@ Nota importante:
 - En este repositorio la "API" se emula con productores Python (`ships_gps_producer.py`, `alerts_producer.py`).
 - En la fase final se podrá sustituir por APIs reales o por NiFi invocando HTTP(s) de fuentes externas.
 
-## 1) Preparación en cada VM (master/slaves)
+## 1) Preparación en standalone (solo master)
 
-En cada VM:
+En `master`:
 
 ```bash
 cd /home/hadoop/PROYECTOLOGISTICA
 source scripts/12_use_existing_kafka.sh
 ```
 
-## 2) Kafka KRaft (3 nodos)
+## 2) Kafka local
 
-Sigue `kafka/kraft/README.md` y arranca Kafka en `master`, `slave01`, `slave02`.
-
-Cuando este arriba, desde `master`:
+Arranca Kafka en `master` y crea topics:
 
 ```bash
 export KAFKA_HOME=/home/hadoop/Descargas/kafka_2.13-4.1.1
-$KAFKA_HOME/bin/kafka-topics.sh --bootstrap-server master:9092 --create --if-not-exists --topic datos_crudos --partitions 3 --replication-factor 2
-$KAFKA_HOME/bin/kafka-topics.sh --bootstrap-server master:9092 --create --if-not-exists --topic alertas_globales --partitions 3 --replication-factor 2
+$KAFKA_HOME/bin/kafka-topics.sh --bootstrap-server master:9092 --create --if-not-exists --topic datos_crudos --partitions 1 --replication-factor 1
+$KAFKA_HOME/bin/kafka-topics.sh --bootstrap-server master:9092 --create --if-not-exists --topic alertas_globales --partitions 1 --replication-factor 1
 $KAFKA_HOME/bin/kafka-topics.sh --bootstrap-server master:9092 --list
 ```
 

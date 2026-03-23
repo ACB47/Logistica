@@ -14,9 +14,9 @@ Este fichero es el **esqueleto** del documento Word. La idea es escribir aquí p
 
 ## 0.1 Estado real de implementación (checkpoint)
 
-- Stack levantado en entorno de 3 VMs:
-  - Hadoop/HDFS + YARN
-  - Kafka KRaft (3 nodos)
+- Stack levantado en modo standalone (master):
+  - Hadoop/HDFS (+ YARN opcional)
+  - Kafka KRaft (nodo local para práctica)
   - Hive Metastore
   - Spark 3.5.x + GraphFrames
   - Airflow 2.10.5
@@ -72,12 +72,12 @@ El enunciado pide Lambda/Kappa y streaming; por restricción del proyecto **no u
 - Procesamiento por **micro‑lotes** desde HDFS con Spark (cada N minutos).
 - Publicación de “resultados” (tablas curadas en Hive + alertas finales en Kafka si aplica).
 
-### 2.2 Componentes (qué va en cada VM)
+### 2.2 Componentes (modo standalone)
 
 Tabla a completar:
-- `master`: NameNode, ResourceManager, Hive Metastore/HiveServer2 (si aplica), Airflow, Kafka controller/broker (KRaft), NiFi (si aplica)
-- `slave01`: DataNode, NodeManager, Kafka broker (KRaft)
-- `slave02`: DataNode, NodeManager, Kafka broker (KRaft)
+- `master`: NameNode, (ResourceManager opcional), Hive Metastore/HiveServer2 (si aplica), Airflow, Kafka controller/broker (KRaft), NiFi (si aplica)
+- `slave01`: no usado en la demo final standalone
+- `slave02`: no usado en la demo final standalone
 
 **Capturas**:
 - VirtualBox: 3 VMs creadas, RAM/CPU asignada.

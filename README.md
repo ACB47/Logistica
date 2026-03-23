@@ -2,9 +2,17 @@
 
 Este repositorio contiene la **guía paso a paso** y los **artefactos** para el proyecto integral de Ingeniería de Datos (ciclo KDD) usando stack Apache.
 
-## Restricciones del proyecto (según enunciado + tu criterio)
+## Modo de ejecución elegido (simplificado)
 
-- **Sí usamos**: VirtualBox (3 VMs: `master`, `slave01`, `slave02`), HDFS, YARN, Kafka en modo **KRaft**, Spark (SQL + GraphFrames), Hive, Airflow, NiFi (si aplica).
+- Ejecución en **standalone** sobre `master` para reducir complejidad operativa.
+- Se mantiene el stack lógico del proyecto (Kafka + HDFS + Spark + Hive + Airflow), pero sin depender de ejecución distribuida en slaves.
+- Los scripts de referencia para este modo son:
+  - `scripts/50_start_standalone.sh`
+  - `scripts/51_stop_standalone.sh`
+
+## Restricciones del proyecto (según enunciado + criterio)
+
+- **Sí usamos**: HDFS, Kafka en modo **KRaft**, Spark (SQL + GraphFrames), Hive, Airflow, NiFi (si aplica).
 - **NO usamos**: Apache Cassandra, **NO** usamos Spark **Structured Streaming**.
 
 > Nota: el PDF original menciona Cassandra y Structured Streaming como parte de la rúbrica. En esta entrega lo sustituimos por:
