@@ -1,71 +1,45 @@
 version: '3.8'
 
 services:
-  app:
-    build: .
-    container_name: logistica-setup
-    depends_on:
-      - kafka
-      - spark-master
-      - cassandra
-    networks:
-      - logistica-net
-
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
-    hostname: zookeeper
-    container_name: zookeeper
     ports:
       - "2181:2181"
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
     networks:
       - logistica-net
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
-    hostname: kafka
-    container_name: kafka
     depends_on:
       - zookeeper
     ports:
       - "9092:9092"
-      - "9101:9101"
     environment:
       KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_JMX_PORT: 9101
-      KAFKA_JMX_HOSTNAME: localhost
     networks:
       - logistica-net
 
-  kafka-topics-init:
+  kafka-init:
     image: confluentinc/cp-kafka:7.5.0
     depends_on:
       - kafka
     command: >
       bash -c "
-        echo 'Esperando Kafka...'
-        cub kafka-ready -b kafka:29092 1 40
-        kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --partitions 1 --replication-factor 1 --topic datos_crudos
+        cub kafka-ready -b kafka:29092 1 40 &&
+        kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --partitions 1 --replication-factor 1 --topic datos_crudos &&
         kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --partitions 1 --replication-factor 1 --topic alertas_globales
-        kafka-topics --list --bootstrap-server kafka:29092
-        echo 'Topics creados'
       "
     networks:
       - logistica-net
 
   namenode:
     image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
-    hostname: namenode
-    container_name: namenode
     ports:
       - "9870:9870"
       - "9000:9000"
@@ -78,8 +52,6 @@ services:
 
   datanode:
     image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
-    hostname: datanode
-    container_name: datanode
     depends_on:
       - namenode
     volumes:
@@ -89,42 +61,8 @@ services:
     networks:
       - logistica-net
 
-  hive-metastore:
-    image: bde2020/hive:2.3.2-metastore-hadoop2.8
-    hostname: hive-metastore
-    container_name: hive-metastore
-    depends_on:
-      - namenode
-      - datanode
-    ports:
-      - "9083:9083"
-    environment:
-      SERVICE_PRECONDITION: "http://namenode:9870"
-      METASTORE_PORT: 9083
-    networks:
-      - logistica-net
-
-  hive-server:
-    image: bde2020/hive:2.3.2-hadoop2.8
-    hostname: hive-server
-    container_name: hive-server
-    depends_on:
-      - namenode
-      - datanode
-      - hive-metastore
-    ports:
-      - "10000:10000"
-      - "10002:10002"
-    environment:
-      SERVICE_PRECONDITION: "http://namenode:9870"
-      HIVE_METASTORE_URIS: thrift://hive-metastore:9083
-    networks:
-      - logistica-net
-
   cassandra:
     image: cassandra:4.1
-    hostname: cassandra
-    container_name: cassandra
     ports:
       - "9042:9042"
     volumes:
@@ -138,25 +76,19 @@ services:
       - cassandra
     command: >
       bash -c "
-        sleep 30
-        pip install cassandra-driver
-        python -c 'from cassandra.cluster import Cluster; c=Cluster([\"cassandra\"]); s=c.connect(); s.execute(\"CREATE KEYSPACE IF NOT EXISTS logistica WITH replication = {\\\"class\\\": \\\"SimpleStrategy\\\", \\\"replication_factor\\\": 1}\"); s.set_keyspace(\"logistica\"); s.execute(\"CREATE TABLE IF NOT EXISTS ship_metrics (window_start timestamp, window_end timestamp, dest_port text, route_id text, avg_speed double, speed_std double, ship_count int, avg_lat double, avg_lon double, processed_at timestamp, PRIMARY KEY (dest_port, window_start))\"); s.execute(\"CREATE TABLE IF NOT EXISTS alert_metrics (window_start timestamp, window_end timestamp, region text, source text, avg_severity double, avg_confidence double, alert_count int, processed_at timestamp, PRIMARY KEY (region, window_start))\"); s.execute(\"CREATE TABLE IF NOT EXISTS ml_predictions (prediction_id timeuuid, ship_id text, dest_port text, predicted_delay_hours double, risk_category text, model_used text, confidence double, created_at timestamp, PRIMARY KEY (ship_id, created_at))\"); s.execute(\"CREATE TABLE IF NOT EXISTS route_alerts (alert_id timeuuid, dest_port text, risk_level text, risk_score double, severity int, recommendation text, email_sent boolean, created_at timestamp, PRIMARY KEY (dest_port, created_at))\"); print(\"Cassandra tables created\")'
+        sleep 20 &&
+        pip install cassandra-driver &&
+        python -c 'from cassandra.cluster import Cluster; c=Cluster([\"cassandra\"]); s=c.connect(); s.execute(\"CREATE KEYSPACE IF NOT EXISTS logistica WITH replication = {\\\"class\\\": \\\"SimpleStrategy\\\", \\\"replication_factor\\\": 1}\"); s.set_keyspace(\"logistica\"); s.execute(\"CREATE TABLE IF NOT EXISTS ship_metrics (window_start timestamp, window_end timestamp, dest_port text, route_id text, avg_speed double, speed_std double, ship_count int, avg_lat double, avg_lon double, processed_at timestamp, PRIMARY KEY (dest_port, window_start))\"); s.execute(\"CREATE TABLE IF NOT EXISTS alert_metrics (window_start timestamp, window_end timestamp, region text, source text, avg_severity double, avg_confidence double, alert_count int, processed_at timestamp, PRIMARY KEY (region, window_start))\"); s.execute(\"CREATE TABLE IF NOT EXISTS ml_predictions (prediction_id timeuuid, ship_id text, dest_port text, predicted_delay_hours double, risk_category text, model_used text, confidence double, created_at timestamp, PRIMARY KEY (ship_id, created_at))\"); s.execute(\"CREATE TABLE IF NOT EXISTS route_alerts (alert_id timeuuid, dest_port text, risk_level text, risk_score double, severity int, recommendation text, email_sent boolean, created_at timestamp, PRIMARY KEY (dest_port, created_at))\"); print(\"Cassandra OK\")'
     networks:
       - logistica-net
 
   spark-master:
     image: bitnami/spark:3.5.0
-    hostname: spark-master
-    container_name: spark-master
     ports:
       - "8080:8080"
       - "7077:7077"
     environment:
       SPARK_MODE: master
-      SPARK_RPC_AUTHENTICATION_ENABLED: "no"
-      SPARK_RPC_ENCRYPTION_ENABLED: "no"
-      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: "no"
-      SPARK_SSL_ENABLED: "no"
     volumes:
       - ./jobs:/jobs
       - ./ingesta:/ingesta
@@ -165,8 +97,6 @@ services:
 
   spark-worker:
     image: bitnami/spark:3.5.0
-    hostname: spark-worker
-    container_name: spark-worker
     depends_on:
       - spark-master
     environment:
@@ -174,10 +104,6 @@ services:
       SPARK_MASTER_URL: spark://spark-master:7077
       SPARK_WORKER_MEMORY: 2G
       SPARK_WORKER_CORES: 2
-      SPARK_RPC_AUTHENTICATION_ENABLED: "no"
-      SPARK_RPC_ENCRYPTION_ENABLED: "no"
-      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: "no"
-      SPARK_SSL_ENABLED: "no"
     volumes:
       - ./jobs:/jobs
       - ./ingesta:/ingesta
@@ -186,15 +112,18 @@ services:
 
   zeppelin:
     image: apache/zeppelin:0.10.1
-    hostname: zeppelin
-    container_name: zeppelin
     ports:
       - "8081:8080"
-    environment:
-      ZEPPELIN_ANONYMOUS_ALLOWED: "true"
     volumes:
       - ./zeppelin:/zeppelin/conf
       - ./jobs:/jobs
+    networks:
+      - logistica-net
+
+  nifi:
+    image: apache/nifi:1.21.0
+    ports:
+      - "8443:8443"
     networks:
       - logistica-net
 
@@ -211,8 +140,6 @@ services:
 
   airflow-webserver:
     image: puckel/docker-airflow:2.7.3
-    hostname: airflow-webserver
-    container_name: airflow-webserver
     depends_on:
       - kafka
       - spark-master
@@ -222,31 +149,15 @@ services:
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
-      AIRFLOW__CORE__FERNET_KEY: ''
-      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
-      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__SMTP__SMTP_HOST: ${SMTP_HOST:-smtp-mail.outlook.com}
       AIRFLOW__SMTP__SMTP_PORT: ${SMTP_PORT:-587}
       AIRFLOW__SMTP__SMTP_USER: ${SMTP_USER:-logistica-alerts@outlook.com}
       AIRFLOW__SMTP__SMTP_PASSWORD: ${SMTP_PASSWORD:-CHANGE_ME}
-      AIRFLOW__SMTP__SMTP_MAIL_FROM: ${SMTP_USER:-logistica-alerts@outlook.com}
     volumes:
       - ./airflow:/opt/airflow
       - ./jobs:/jobs
       - ./ingesta:/ingesta
-    networks:
-      - logistica-net
-
-  nifi:
-    image: apache/nifi:1.21.0
-    hostname: nifi
-    container_name: nifi
-    ports:
-      - "8443:8443"
-    environment:
-      NIFI_WEB_HTTP_PORT: 8443
-    volumes:
-      - ./nifi:/opt/nifi/nifi-current/custom
     networks:
       - logistica-net
 
