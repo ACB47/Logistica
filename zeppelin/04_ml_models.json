@@ -1,0 +1,42 @@
+%spark
+import org.apache.spark.ml.regression.LinearRegression
+import org.apache.spark.ml.classification.RandomForestClassifier
+import org.apache.spark.ml.feature.VectorAssembler
+import org.apache.spark.ml.clustering.KMeans
+import org.apache.spark.ml.Pipeline
+
+val trainingData = spark.table("logistica.fact_route_risk")
+
+val featureCols = Array("time_shanghai_to_via_hours", "time_via_to_valladolid_hours", "estimated_total_hours")
+val assembler = new VectorAssembler()
+  .setInputCols(featureCols)
+  .setOutputCol("features")
+
+val assembled = assembler.transform(trainingData.select(
+  col("risk_score").alias("label"),
+  col("time_shanghai_to_via_hours"),
+  col("time_via_to_valladolid_hours"),
+  col("estimated_total_hours")
+)).select("features", "label")
+
+val lr = new LinearRegression()
+  .setLabelCol("label")
+  .setMaxIter(10)
+
+val lrModel = lr.fit(assembled)
+println(s"Linear Regression RMSE: ${lrModel.summary.rootMeanSquaredError}")
+println(s"Linear Regression R2: ${lrModel.summary.r2}")
+
+val rf = new RandomForestClassifier()
+  .setLabelCol("label")
+  .setNumTrees(5)
+
+val rfModel = rf.fit(assembled)
+val rfPredictions = rfModel.transform(assembled)
+val rfAccuracy = rfPredictions.filter($"prediction" === $"label").count.toDouble / rfPredictions.count()
+println(s"Random Forest Accuracy: ${rfAccuracy}")
+
+val kmeans = new KMeans().setK(3).setSeed(42)
+val kmeansModel = kmeans.fit(assembled.select("features"))
+val predictions = kmeansModel.transform(assembled)
+predictions.groupBy("prediction").count().show()

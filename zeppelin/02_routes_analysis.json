@@ -1,0 +1,18 @@
+%spark
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
+
+val ships = spark.table("logistica.stg_ships")
+val routeRisk = spark.table("logistica.fact_route_risk")
+
+val summary = ships.groupBy("dest_port")
+  .agg(
+    count("*").alias("total_ships"),
+    avg("speed_kn").alias("avg_speed"),
+    avg("lat").alias("avg_lat"),
+    avg("lon").alias("avg_lon")
+  )
+  .join(routeRisk, ships("dest_port") === routeRisk("via_port"))
+
+summary.createOrReplaceTempView("route_summary")
+spark.sql("SELECT * FROM route_summary").show()

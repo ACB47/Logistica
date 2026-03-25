@@ -1,0 +1,19 @@
+%spark
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
+
+val alerts = spark.table("logistica.fact_alerts")
+
+val alertSummary = alerts.groupBy("risk_level", "stock_status")
+  .agg(
+    count("*").alias("count"),
+    avg("risk_score").alias("avg_risk_score"),
+    avg("severity").alias("avg_severity")
+  )
+  .orderBy(desc("avg_risk_score"))
+
+alertSummary.show()
+
+val criticalAlerts = alerts.filter(col("severity") >= 4)
+criticalAlerts.createOrReplaceTempView("critical_alerts")
+spark.sql("SELECT * FROM critical_alerts ORDER BY severity DESC").show()

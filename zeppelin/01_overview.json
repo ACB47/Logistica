@@ -1,0 +1,6 @@
+%spark
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
+
+val hiveTables = spark.sql("SHOW TABLES IN logistica")
+hiveTables.show()
