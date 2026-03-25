@@ -7,23 +7,27 @@ set -euo pipefail
 #   bash scripts/20_create_kafka_topics.sh master:9092
 
 BOOTSTRAP="${1:-master:9092}"
+PARTITIONS="${PARTITIONS:-1}"
+REPLICATION_FACTOR="${REPLICATION_FACTOR:-1}"
 KAFKA_TOPICS="${KAFKA_HOME:-}/bin/kafka-topics.sh"
 if [[ -z "${KAFKA_HOME:-}" ]]; then
   # fallback a PATH
-  KAFKA_TOPICS="kafka-topics.sh"
+  KAFKA_TOPICS="/opt/kafka/bin/kafka-topics.sh"
 fi
 
-"${KAFKA_TOPICS}" --bootstrap-server "${BOOTSTRAP}" --create \
-  --topic datos_crudos \
-  --partitions 3 \
-  --replication-factor 2
+TOPICS=(
+  datos_crudos
+  alertas_globales
+  datos_filtrados
+)
 
-"${KAFKA_TOPICS}" --bootstrap-server "${BOOTSTRAP}" --create \
-  --topic alertas_globales \
-  --partitions 3 \
-  --replication-factor 2
+for topic in "${TOPICS[@]}"; do
+  "${KAFKA_TOPICS}" --bootstrap-server "${BOOTSTRAP}" --create --if-not-exists \
+    --topic "${topic}" \
+    --partitions "${PARTITIONS}" \
+    --replication-factor "${REPLICATION_FACTOR}"
+done
 
 echo
 echo "Topics creados:"
 "${KAFKA_TOPICS}" --bootstrap-server "${BOOTSTRAP}" --list
-

@@ -32,6 +32,22 @@ El proyecto está **completamente dockerizado** para ejecutarse en cualquier ord
 ./stop.sh
 ```
 
+## Ruta recomendada de entrega
+
+- Ruta oficial para la memoria y la defensa: entorno tipo cluster/VM con HDFS, YARN, Kafka KRaft, Spark, Hive, Cassandra, Airflow y NiFi.
+- Ruta Docker (`docker-compose.yml` y `docker-compose.simple.yml`): demo local y validacion rapida del stack.
+- Si hay diferencias entre ambas rutas, la implementacion que se ensena en la entrega debe priorizar la ruta oficial de la rubrica.
+
+## NiFi - primer flujo real
+
+- Credenciales locales por defecto:
+  - usuario: `admin`
+  - password: `Admin123456!`
+- Healthcheck rapido:
+  - `bash scripts/61_nifi_healthcheck.sh`
+- Diseno inicial del flujo real:
+  - `docs/01_nifi_open_meteo_flow.md`
+
 ## Stack tecnológico (rúbrica cumplida)
 
 | Componente | Implementación |
