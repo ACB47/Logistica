@@ -1,3 +1,4 @@
 pyspark==3.5.0
 cassandra-driver==3.29.1
-graphframes==0.8.3-spark3.5-s_2.12
+# GraphFrames no se instala por pip con este identificador; cargar con:
+# spark-submit --packages graphframes:graphframes:0.8.3-spark3.5-s_2.12 ...

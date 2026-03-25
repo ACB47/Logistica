@@ -17,6 +17,8 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - La inicializacion de Kafka ya crea los tres topics base del proyecto: `datos_crudos`, `alertas_globales` y `datos_filtrados`.
 - Se dejo preparada la base del primer flujo real de NiFi con Open-Meteo, credenciales fijas locales y script de healthcheck autenticado.
 - El flujo real de NiFi ya quedo validado extremo a extremo con mensajes visibles en Kafka tanto en `datos_crudos` como en `datos_filtrados`.
+- Ya existe un job Spark dedicado para mover `datos_filtrados` a Hive staging: `jobs/spark/01_weather_filtered_to_staging.py`.
+- El flujo de NiFi ya esta exportado para reutilizarlo y documentarlo en `OpenMeteo_Kafka_Flow.json`.
 - Lo mas importante pendiente ahora es NiFi real con API publica, YARN, topic filtrado, streaming/ventanas de 15 minutos, caso real de Cassandra y documentacion final.
 
 ## Estado por fases KDD
@@ -50,6 +52,7 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
   - Flujo Open-Meteo validado con consumo real en Kafka:
     - `datos_crudos` contiene el JSON original de la API
     - `datos_filtrados` contiene el JSON transformado para analitica
+  - Export del canvas NiFi disponible en `OpenMeteo_Kafka_Flow.json`
 - Falta para cerrar:
   - flujo real con NiFi y API publica
   - topic de `datos_filtrados`
@@ -60,6 +63,7 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - Estado: bastante avanzada.
 - Hecho:
   - staging en Hive/HDFS con `jobs/spark/01_raw_to_staging.py`
+  - nuevo staging desde Kafka `datos_filtrados` a Hive con `jobs/spark/01_weather_filtered_to_staging.py`
   - limpieza, `dropna`, `dropDuplicates`, schemas explicitos
   - analitica de grafos con `jobs/spark/02_graph_metrics.py`
 - Falta para cerrar:
@@ -67,6 +71,8 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
   - enriquecimiento formal con joins a dimensiones
   - mejor cierre del caso de grafos para la defensa
   - validacion en YARN del flujo principal
+  - ejecutar de verdad `01_weather_filtered_to_staging.py` en entorno con PySpark disponible y verificar `logistica.stg_weather_open_meteo`
+  - terminar de preparar o reutilizar `.venv-jobs` para ejecucion local con PySpark si se quiere correr fuera del cluster
 
 ### Fase III - Mineria y accion
 - Estado: parcial.
@@ -136,11 +142,11 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - `docker-compose.simple.yml`
 
 ## Siguiente bloque recomendado
-1. Integrar este nuevo stream de `datos_filtrados` en Spark/Hive como parte de la narrativa KDD.
-2. Ejecutar y documentar al menos un job Spark en YARN.
-3. Cerrar el caso Cassandra de baja latencia y ajustar streaming a ventanas de 15 minutos.
-4. Afinar Airflow para orquestar este flujo y sus dependencias.
-5. Pasar este hito a commit y reflejarlo en la memoria con capturas del canvas y del consumo Kafka.
+1. Ejecutar `spark-submit jobs/spark/01_weather_filtered_to_staging.py --bootstrap kafka:9092 --topic datos_filtrados` en entorno con PySpark/Hive.
+2. Verificar que se crea `logistica.stg_weather_open_meteo` con datos reales de Open-Meteo.
+3. Ejecutar y documentar al menos un job Spark en YARN.
+4. Cerrar el caso Cassandra de baja latencia y ajustar streaming a ventanas de 15 minutos.
+5. Afinar Airflow para orquestar este flujo y sus dependencias.
 
 ## Regla de mantenimiento
 - Cada vez que se cierre un bloque de trabajo relevante, actualizar este archivo con:

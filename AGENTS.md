@@ -47,6 +47,7 @@ Guidance for coding agents working in this repository.
 - Alerts producer: `python3 ingesta/productores/alerts_producer.py --bootstrap master:9092 --topic alertas_globales`
 - Raw sink: `python3 ingesta/consumidores/kafka_to_hdfs_raw.py --bootstrap master:9092 --group-id logistica-raw-sink --spool-dir /tmp/logistica_spool --flush-every-sec 30`
 - Spark raw-to-staging: `spark-submit jobs/spark/01_raw_to_staging.py`
+- Spark weather filtered-to-staging: `spark-submit jobs/spark/01_weather_filtered_to_staging.py --bootstrap kafka:9092 --topic datos_filtrados`
 - Spark graph metrics: `spark-submit --packages graphframes:graphframes:0.8.3-spark3.5-s_2.12 jobs/spark/02_graph_metrics.py`
 - Spark score and alert: `spark-submit jobs/spark/03_score_and_alert.py`
 - Airflow webserver: `AIRFLOW_HOME=$PWD/.airflow airflow webserver --port 8080`
@@ -78,6 +79,7 @@ Guidance for coding agents working in this repository.
 - Run the smallest affected Spark job directly with `spark-submit`.
 - Example single-job checks:
   - `spark-submit jobs/spark/01_raw_to_staging.py`
+  - `spark-submit jobs/spark/01_weather_filtered_to_staging.py --bootstrap kafka:9092 --topic datos_filtrados`
   - `spark-submit --packages graphframes:graphframes:0.8.3-spark3.5-s_2.12 jobs/spark/02_graph_metrics.py`
 
 ## Single-Test Guidance
