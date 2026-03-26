@@ -37,7 +37,8 @@ def main() -> None:
 
     spark = (
         SparkSession.builder.appName("logistica-01-weather-filtered-to-staging")
-        .config("spark.sql.warehouse.dir", "hdfs:///user/hive/warehouse")
+        .config("spark.hadoop.fs.defaultFS", "hdfs://namenode:8020")
+        .config("spark.sql.warehouse.dir", "hdfs://namenode:8020/user/hive/warehouse")
         .enableHiveSupport()
         .getOrCreate()
     )
@@ -73,7 +74,7 @@ def main() -> None:
     (
         weather.write.mode("overwrite")
         .format("parquet")
-        .option("path", "hdfs:///hadoop/logistica/staging/stg_weather_open_meteo")
+        .option("path", "hdfs://namenode:8020/hadoop/logistica/staging/stg_weather_open_meteo")
         .saveAsTable("logistica.stg_weather_open_meteo")
     )
 

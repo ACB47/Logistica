@@ -18,7 +18,12 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - Se dejo preparada la base del primer flujo real de NiFi con Open-Meteo, credenciales fijas locales y script de healthcheck autenticado.
 - El flujo real de NiFi ya quedo validado extremo a extremo con mensajes visibles en Kafka tanto en `datos_crudos` como en `datos_filtrados`.
 - Ya existe un job Spark dedicado para mover `datos_filtrados` a Hive staging: `jobs/spark/01_weather_filtered_to_staging.py`.
-- El flujo de NiFi ya esta exportado para reutilizarlo y documentarlo en `OpenMeteo_Kafka_Flow.json`.
+- El flujo de NiFi ya esta exportado para reutilizarlo y documentarlo en `docs/nifi/OpenMeteo_Kafka_Flow.json`.
+- Queda preparado un wrapper para lanzar el job de weather staging: `scripts/63_run_weather_filtered_staging.sh`.
+- Ya se probaron varias veces los pasos reales de Spark/Hive; el bloqueo actual ya no es Kafka ni permisos base, sino HDFS sin DataNode utilizable para escritura.
+- El despliegue HDFS Docker ya fue corregido: NameNode y DataNode registran correctamente con `fs.defaultFS=hdfs://namenode:8020` y volumenes separados.
+- El flujo completo `datos_filtrados -> Spark -> Hive/HDFS` ya esta validado con 3 filas reales cargadas en `logistica.stg_weather_open_meteo`.
+- Ya existe una segunda capa KDD sobre el clima: `logistica.dim_ports_routes_weather`, que enriquece `stg_weather_open_meteo` con contexto de ruta, almacen y estado operativo.
 - Lo mas importante pendiente ahora es NiFi real con API publica, YARN, topic filtrado, streaming/ventanas de 15 minutos, caso real de Cassandra y documentacion final.
 
 ## Estado por fases KDD
@@ -52,7 +57,8 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
   - Flujo Open-Meteo validado con consumo real en Kafka:
     - `datos_crudos` contiene el JSON original de la API
     - `datos_filtrados` contiene el JSON transformado para analitica
-  - Export del canvas NiFi disponible en `OpenMeteo_Kafka_Flow.json`
+  - Export del canvas NiFi disponible en `docs/nifi/OpenMeteo_Kafka_Flow.json`
+  - Stack `simple core` reanudado con Kafka, NiFi y Postgres activos; Airflow vuelve a levantar tras recrear el contenedor
 - Falta para cerrar:
   - flujo real con NiFi y API publica
   - topic de `datos_filtrados`
@@ -66,12 +72,21 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
   - nuevo staging desde Kafka `datos_filtrados` a Hive con `jobs/spark/01_weather_filtered_to_staging.py`
   - limpieza, `dropna`, `dropDuplicates`, schemas explicitos
   - analitica de grafos con `jobs/spark/02_graph_metrics.py`
+  - `01_weather_filtered_to_staging.py` ya incorpora `fs.defaultFS` hacia `hdfs://namenode:8020`
+  - se creo `/user/hive/warehouse` y `/hadoop/logistica/staging` con permisos de escritura en HDFS
+  - `spark-submit` del job ya funciona con el paquete Kafka correcto y crea `logistica.stg_weather_open_meteo`
+  - tabla validada con datos reales:
+    - `2026-03-26T19:00:00 | 15.1 | 75 | 38.7 | severity 3`
+    - `2026-03-26T18:55:00 | 14.5 | 78 | 22.1 | severity 2`
+    - `2026-03-26T18:50:00 | 14.2 | 80 | 12.4 | severity 1`
+  - enriquecimiento validado en `logistica.dim_ports_routes_weather`:
+    - `Algeciras | Shanghai | route-shanghai-algeciras | Valladolid | severity 3 | MEDIO | METEO_VIGILANCIA | 6.0h`
+    - `Algeciras | Shanghai | route-shanghai-algeciras | Valladolid | severity 2 | MEDIO | OPERATIVO | 3.0h`
+    - `Algeciras | Shanghai | route-shanghai-algeciras | Valladolid | severity 1 | BAJO | OPERATIVO | 1.0h`
 - Falta para cerrar:
-  - dimensiones maestras reales en Hive
-  - enriquecimiento formal con joins a dimensiones
+  - sustituir la dimension embebida de puertos/rutas por dimensiones maestras reales en Hive
   - mejor cierre del caso de grafos para la defensa
   - validacion en YARN del flujo principal
-  - ejecutar de verdad `01_weather_filtered_to_staging.py` en entorno con PySpark disponible y verificar `logistica.stg_weather_open_meteo`
   - terminar de preparar o reutilizar `.venv-jobs` para ejecucion local con PySpark si se quiere correr fuera del cluster
 
 ### Fase III - Mineria y accion
@@ -117,6 +132,7 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - Falta evidenciar YARN en la ruta principal de ejecucion.
 - Falta separar `datos_crudos` y `datos_filtrados`.
 - El job de streaming usa ventanas de 5 minutos, no 15.
+- En Docker full, HDFS ya escribe correctamente; ahora el punto a vigilar es no perder mensajes de Kafka al recrear el broker durante pruebas.
 - El bloqueo por espacio en disco ya no aplica: `/` volvio a tener margen libre suficiente tras la limpieza.
 
 ## Decision de arquitectura actual
@@ -130,10 +146,13 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - `SESSION_STATUS.md`
 - `scripts/60_manage_docker_stack.sh`
 - `scripts/61_nifi_healthcheck.sh`
+- `scripts/63_run_weather_filtered_staging.sh`
 - `docs/00_documento_word.md`
 - `docs/01_nifi_open_meteo_flow.md`
 - `airflow/dags/logistica_kdd_dag.py`
 - `jobs/spark/01_raw_to_staging.py`
+- `jobs/spark/01_weather_filtered_to_staging.py`
+- `jobs/spark/02_weather_port_enrichment.py`
 - `jobs/spark/02_graph_metrics.py`
 - `jobs/spark/03_score_and_alert.py`
 - `jobs/spark/04_streaming_ml_pipeline.py`
@@ -142,8 +161,8 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - `docker-compose.simple.yml`
 
 ## Siguiente bloque recomendado
-1. Ejecutar `spark-submit jobs/spark/01_weather_filtered_to_staging.py --bootstrap kafka:9092 --topic datos_filtrados` en entorno con PySpark/Hive.
-2. Verificar que se crea `logistica.stg_weather_open_meteo` con datos reales de Open-Meteo.
+1. Capturar este resultado para la memoria: canvas NiFi, topic `datos_filtrados`, tabla `logistica.stg_weather_open_meteo`, tabla `logistica.dim_ports_routes_weather` y sus parquet en HDFS.
+2. Conectar `dim_ports_routes_weather` con `fact_route_risk` o `fact_alerts` para construir una fact table operativa final.
 3. Ejecutar y documentar al menos un job Spark en YARN.
 4. Cerrar el caso Cassandra de baja latencia y ajustar streaming a ventanas de 15 minutos.
 5. Afinar Airflow para orquestar este flujo y sus dependencias.

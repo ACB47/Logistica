@@ -119,6 +119,20 @@ Tabla a completar:
 - Comandos de creación de topics.
 - `kafka-topics --describe`.
 
+### 4.2 Evidencia del flujo NiFi
+
+- Flujo exportado reutilizable:
+  - `docs/nifi/OpenMeteo_Kafka_Flow.json`
+- Uso en la memoria:
+  - referenciar el JSON como artefacto tecnico del canvas real
+  - añadir una captura PNG del canvas en ejecucion
+  - explicar que el JSON permite reimportar y auditar el flujo
+
+**Capturas**:
+- Canvas completo de NiFi.
+- Configuracion de `InvokeHTTP`.
+- Configuracion de `PublishKafka`.
+
 ### 4.2 Formato de eventos (contratos)
 
 Definir JSON mínimo:
@@ -341,4 +355,3 @@ Sección a completar con diagrama:
 - Qué problemas resuelve.
 - Limitaciones (no Cassandra, no structured streaming).
 - Mejoras futuras (observabilidad, modelos ML más avanzados, etc.).
-

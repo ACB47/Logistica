@@ -45,9 +45,11 @@ services:
       - "9870:9870"
       - "9000:9000"
     volumes:
-      - hdfs_data:/hadoop/dfs/name
+      - hdfs_namenode:/hadoop/dfs/name
     environment:
       CLUSTER_NAME: logistica-cluster
+      CORE_CONF_fs_defaultFS: hdfs://namenode:8020
+      HDFS_CONF_dfs_replication: 1
     networks:
       - logistica-net
 
@@ -56,9 +58,11 @@ services:
     depends_on:
       - namenode
     volumes:
-      - hdfs_data:/hadoop/dfs/data
+      - hdfs_datanode:/hadoop/dfs/data
     environment:
-      SERVICE_PRECONDITION: "http://namenode:9870"
+      CORE_CONF_fs_defaultFS: hdfs://namenode:8020
+      HDFS_CONF_dfs_replication: 1
+      SERVICE_PRECONDITION: "namenode:9870"
     networks:
       - logistica-net
 
@@ -128,6 +132,7 @@ services:
 
   airflow-webserver:
     image: apache/airflow:2.10.5-python3.10
+    user: "${AIRFLOW_UID:-1000}:0"
     depends_on:
       - kafka
       - postgres
@@ -152,7 +157,8 @@ services:
       - logistica-net
 
 volumes:
-  hdfs_data:
+  hdfs_namenode:
+  hdfs_datanode:
   cassandra_data:
   kafka_data:
   postgres_data:

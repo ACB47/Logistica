@@ -47,6 +47,8 @@ El proyecto está **completamente dockerizado** para ejecutarse en cualquier ord
   - `bash scripts/61_nifi_healthcheck.sh`
 - Diseno inicial del flujo real:
   - `docs/01_nifi_open_meteo_flow.md`
+- Export reutilizable del canvas:
+  - `docs/nifi/OpenMeteo_Kafka_Flow.json`
 
 ## Stack tecnológico (rúbrica cumplida)
 

@@ -1,3 +1,11 @@
 .venv-jobs/
 __pycache__/
 *.pyc
+
+# Airflow local artifacts
+airflow/airflow.cfg
+airflow/airflow.db
+airflow/airflow-webserver.pid
+airflow/standalone_admin_password.txt
+airflow/logs/
+airflow/webserver_config.py
