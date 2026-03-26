@@ -1,0 +1,2 @@
+{"event_type":"weather_alert","ts":"2026-03-26T18:42:00","source":"open_meteo","severity":3,"region":"Estrecho de Gibraltar","text":"Viento moderado con impacto operativo en Algeciras","confidence":0.88}
+{"event_type":"weather_alert","ts":"2026-03-26T18:47:00","source":"open_meteo","severity":2,"region":"Costa Mediterranea","text":"Oleaje moderado cerca de Valencia","confidence":0.81}

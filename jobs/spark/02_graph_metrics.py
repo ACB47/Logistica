@@ -10,7 +10,8 @@ from graphframes import GraphFrame
 def main() -> None:
     spark = (
         SparkSession.builder.appName("logistica-02-graph-metrics")
-        .config("spark.sql.warehouse.dir", "hdfs:///hadoop/logistica/warehouse")
+        .config("spark.hadoop.fs.defaultFS", "hdfs://namenode:8020")
+        .config("spark.sql.warehouse.dir", "hdfs://namenode:8020/user/hive/warehouse")
         .enableHiveSupport()
         .getOrCreate()
     )
@@ -109,6 +110,18 @@ def main() -> None:
         col("distances").getItem("Shanghai").alias("hops_from_shanghai"),
     )
 
+    centrality = (
+        g.degrees.join(vertices, g.degrees.id == vertices.id, "left")
+        .select(
+            g.degrees.id.alias("node_id"),
+            col("type").alias("node_type"),
+            col("degree"),
+            when(col("degree") >= lit(2), lit("NODO_CRITICO")).otherwise(lit("NODO_NORMAL")).alias(
+                "criticality_level"
+            ),
+        )
+    )
+
     # ---------------------------------
     # 4) Risk table por ruta (puerto intermedio)
     # ---------------------------------
@@ -132,15 +145,20 @@ def main() -> None:
     (
         risk_by_route.write.mode("overwrite")
         .format("parquet")
-        .option("path", "hdfs:///hadoop/logistica/curated/fact_route_risk")
+        .option("path", "hdfs://namenode:8020/hadoop/logistica/curated/fact_route_risk")
         .saveAsTable("logistica.fact_route_risk")
     )
 
     # También persistimos la tabla de hops para evidencia
     spark.sql("DROP TABLE IF EXISTS logistica.fact_graph_hops")
     shortest_hops.write.mode("overwrite").format("parquet").option(
-        "path", "hdfs:///hadoop/logistica/curated/fact_graph_hops"
+        "path", "hdfs://namenode:8020/hadoop/logistica/curated/fact_graph_hops"
     ).saveAsTable("logistica.fact_graph_hops")
+
+    spark.sql("DROP TABLE IF EXISTS logistica.fact_graph_centrality")
+    centrality.write.mode("overwrite").format("parquet").option(
+        "path", "hdfs://namenode:8020/hadoop/logistica/curated/fact_graph_centrality"
+    ).saveAsTable("logistica.fact_graph_centrality")
 
     print("OK - GraphFrames metrics creadas:")
     spark.sql("SHOW TABLES IN logistica").show(truncate=False)
@@ -150,4 +168,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

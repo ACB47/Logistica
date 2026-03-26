@@ -22,6 +22,7 @@ if ! "$KAFKA_HOME/bin/kafka-topics.sh" --bootstrap-server master:9092 --list >/d
 fi
 "$KAFKA_HOME/bin/kafka-topics.sh" --bootstrap-server master:9092 --create --if-not-exists --topic datos_crudos --partitions 1 --replication-factor 1 || true
 "$KAFKA_HOME/bin/kafka-topics.sh" --bootstrap-server master:9092 --create --if-not-exists --topic alertas_globales --partitions 1 --replication-factor 1 || true
+"$KAFKA_HOME/bin/kafka-topics.sh" --bootstrap-server master:9092 --create --if-not-exists --topic datos_filtrados --partitions 1 --replication-factor 1 || true
 
 echo "== 4) Airflow =="
 cd "$PROJECT_HOME"
@@ -39,4 +40,4 @@ echo "Standalone listo."
 echo "- Airflow: http://master:8080 (admin/admin)"
 echo "- Kafka topics:"
 "$KAFKA_HOME/bin/kafka-topics.sh" --bootstrap-server master:9092 --list || true
-
+echo "- Spark YARN weather staging: bash scripts/64_run_weather_filtered_staging_yarn.sh"

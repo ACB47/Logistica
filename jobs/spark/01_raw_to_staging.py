@@ -52,7 +52,8 @@ def read_jsonl_text(spark: SparkSession, path_glob: str, schema: StructType):
 def main() -> None:
     spark = (
         SparkSession.builder.appName("logistica-01-raw-to-staging")
-        .config("spark.sql.warehouse.dir", "hdfs:///user/hive/warehouse")
+        .config("spark.hadoop.fs.defaultFS", "hdfs://namenode:8020")
+        .config("spark.sql.warehouse.dir", "hdfs://namenode:8020/user/hive/warehouse")
         .enableHiveSupport()
         .getOrCreate()
     )
@@ -62,11 +63,11 @@ def main() -> None:
     # RAW paths (particionados por fecha/hora)
     # Estructura real generada por el sink:
     #   /ships/YYYY/MM/DD/HHMM/*.jsonl
-    ships_glob = "hdfs:///hadoop/logistica/raw/ships/*/*/*/*/*.jsonl"
-    clima_glob = "hdfs:///hadoop/logistica/raw/clima/*/*/*/*/*.jsonl"
-    noticias_glob = "hdfs:///hadoop/logistica/raw/noticias/*/*/*/*/*.jsonl"
+    ships_glob = "hdfs://namenode:8020/hadoop/logistica/raw/ships/*/*/*/*/*.jsonl"
+    clima_glob = "hdfs://namenode:8020/hadoop/logistica/raw/clima/*/*/*/*/*.jsonl"
+    noticias_glob = "hdfs://namenode:8020/hadoop/logistica/raw/noticias/*/*/*/*/*.jsonl"
 
-    staging_base = "hdfs:///hadoop/logistica/staging"
+    staging_base = "hdfs://namenode:8020/hadoop/logistica/staging"
     ships_path = f"{staging_base}/stg_ships"
     clima_path = f"{staging_base}/stg_alerts_clima"
     noticias_path = f"{staging_base}/stg_alerts_noticias"
@@ -136,4 +137,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

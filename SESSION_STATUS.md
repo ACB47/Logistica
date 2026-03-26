@@ -24,6 +24,14 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - El despliegue HDFS Docker ya fue corregido: NameNode y DataNode registran correctamente con `fs.defaultFS=hdfs://namenode:8020` y volumenes separados.
 - El flujo completo `datos_filtrados -> Spark -> Hive/HDFS` ya esta validado con 3 filas reales cargadas en `logistica.stg_weather_open_meteo`.
 - Ya existe una segunda capa KDD sobre el clima: `logistica.dim_ports_routes_weather`, que enriquece `stg_weather_open_meteo` con contexto de ruta, almacen y estado operativo.
+- Ya existe una fact table operativa final: `logistica.fact_weather_operational`, con accion recomendada y severidad operativa para la toma de decisiones.
+- Los jobs legacy de staging, grafos y alertas ya vuelven a funcionar con HDFS explicito en `hdfs://namenode:8020`.
+- Ya existen dimensiones maestras reales en Hive para puertos, rutas, almacen y SKU: `dim_ports`, `dim_routes`, `dim_warehouse`, `dim_skus`.
+- GraphFrames ya cubre una segunda metrica defendible: criticidad por grado en `logistica.fact_graph_centrality`.
+- La ruta YARN ya queda preparada y documentada para el job meteorologico con `scripts/64_run_weather_filtered_staging_yarn.sh`.
+- El caso Cassandra de baja latencia ya queda cubierto con `logistica.vehicle_latest_state` y el loader `scripts/65_load_vehicle_latest_state_cassandra.sh`.
+- El pipeline streaming ya queda alineado al enunciado en ventanas de `15 minutes` y con checkpoints HDFS explicitos.
+- La estrategia de defensa ya queda decidida: `micro-batch documentado` como camino principal, con streaming real como evidencia complementaria.
 - Lo mas importante pendiente ahora es NiFi real con API publica, YARN, topic filtrado, streaming/ventanas de 15 minutos, caso real de Cassandra y documentacion final.
 
 ## Estado por fases KDD
@@ -83,10 +91,32 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
     - `Algeciras | Shanghai | route-shanghai-algeciras | Valladolid | severity 3 | MEDIO | METEO_VIGILANCIA | 6.0h`
     - `Algeciras | Shanghai | route-shanghai-algeciras | Valladolid | severity 2 | MEDIO | OPERATIVO | 3.0h`
     - `Algeciras | Shanghai | route-shanghai-algeciras | Valladolid | severity 1 | BAJO | OPERATIVO | 1.0h`
+  - fact operativa validada en `logistica.fact_weather_operational`:
+    - `Algeciras | route-shanghai-algeciras | MEDIO | METEO_VIGILANCIA | 6.0h | reprogramar ventana portuaria... | 4`
+    - `Algeciras | route-shanghai-algeciras | MEDIO | OPERATIVO | 3.0h | seguimiento normal... | 3`
+    - `Algeciras | route-shanghai-algeciras | BAJO | OPERATIVO | 1.0h | seguimiento normal... | 2`
+  - pipeline legacy restaurado con muestra raw en HDFS:
+    - `logistica.stg_ships`: 3 filas
+    - `logistica.stg_alerts_clima`: 2 filas
+    - `logistica.stg_alerts_noticias`: 2 filas
+    - `logistica.fact_route_risk`: 3 filas
+    - `logistica.fact_graph_hops`: 5 nodos
+    - `logistica.fact_alerts`: 3 filas
+  - dimensiones maestras validadas:
+    - `logistica.dim_ports`: 4 puertos
+    - `logistica.dim_routes`: 3 rutas
+    - `logistica.dim_warehouse`: 1 almacen
+    - `logistica.dim_skus`: 1 SKU
+  - enriquecimiento ya usa dimensiones Hive reales:
+    - `PORT-ALG | Algeciras | route-shanghai-algeciras | WH-VLL | Valladolid | MEDIO | METEO_VIGILANCIA`
+    - `PORT-ALG | route-shanghai-algeciras | reprogramar ventana portuaria... | 4`
+  - segunda metrica de grafos validada en `logistica.fact_graph_centrality`:
+    - `Shanghai | degree 3 | NODO_CRITICO`
+    - `Valladolid | degree 3 | NODO_CRITICO`
+    - `Algeciras | degree 2 | NODO_CRITICO`
 - Falta para cerrar:
-  - sustituir la dimension embebida de puertos/rutas por dimensiones maestras reales en Hive
   - mejor cierre del caso de grafos para la defensa
-  - validacion en YARN del flujo principal
+  - ejecutar esta ruta YARN en el entorno master/VM y guardar captura del ResourceManager
   - terminar de preparar o reutilizar `.venv-jobs` para ejecucion local con PySpark si se quiere correr fuera del cluster
 
 ### Fase III - Mineria y accion
@@ -96,10 +126,13 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
   - pipeline streaming/ML experimental: `jobs/spark/04_streaming_ml_pipeline.py`
   - modulo email: `jobs/spark/05_email_alerts.py`
   - Cassandra Docker subida a `5.0` en Compose
+  - tabla Cassandra `logistica.vehicle_latest_state` validada con 3 vehiculos:
+    - `ship-001 | Algeciras | stock 11 | reorder 30`
+    - `ship-002 | Valencia | stock 93 | reorder 30`
+    - `ship-003 | Barcelona | stock 95 | reorder 30`
+  - `jobs/spark/04_streaming_ml_pipeline.py` actualizado a ventanas de `15 minutes`
+  - checkpoints streaming alineados a `hdfs://namenode:8020/hadoop/logistica/checkpoint/...`
 - Falta para cerrar:
-  - ajustar ventanas a 15 minutos
-  - decidir estrategia final: streaming real o micro-batch defendido
-  - caso Cassandra de ultimo estado por vehiculo
   - integracion completa de alertas y pruebas de extremo a extremo
 
 ### Fase IV - Orquestacion
@@ -107,17 +140,19 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - Hecho:
   - DAG existente: `airflow/dags/logistica_kdd_dag.py`
   - dependencias y reintentos basicos
+  - DAG ya separado en tareas mas cercanas al KDD real: staging, dimensiones, grafo, scoring, weather facts, Cassandra y limpieza HDFS
+  - reentrenamiento mensual y limpieza HDFS ya modelados en un segundo DAG: `logistica_kdd_monthly_retrain`
+  - visibilidad de fallo mejorada con `email_on_failure`
 - Falta para cerrar:
-  - DAG orientado al requisito de reentrenamiento mensual
-  - limpieza de temporales en HDFS
-  - alertas de fallo mejor definidas
   - validacion en la version final de Airflow de la entrega
+  - preparar evidencias visuales: Graph view, run exitoso y reintento
 
 ### Fase V - Documentacion y defensa
 - Estado: empezada pero no cerrada.
 - Hecho:
   - guia base: `docs/00_documento_word.md`
   - notebooks Zeppelin existentes en `zeppelin/`
+  - checklist exacto de evidencias y comandos ya documentado en `docs/00_documento_word.md`
 - Falta para cerrar:
   - memoria final completa
   - capturas obligatorias
@@ -147,12 +182,16 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - `scripts/60_manage_docker_stack.sh`
 - `scripts/61_nifi_healthcheck.sh`
 - `scripts/63_run_weather_filtered_staging.sh`
+- `scripts/64_run_weather_filtered_staging_yarn.sh`
+- `scripts/65_load_vehicle_latest_state_cassandra.sh`
 - `docs/00_documento_word.md`
 - `docs/01_nifi_open_meteo_flow.md`
 - `airflow/dags/logistica_kdd_dag.py`
 - `jobs/spark/01_raw_to_staging.py`
+- `jobs/spark/01_load_master_dimensions.py`
 - `jobs/spark/01_weather_filtered_to_staging.py`
 - `jobs/spark/02_weather_port_enrichment.py`
+- `jobs/spark/03_weather_operational_fact.py`
 - `jobs/spark/02_graph_metrics.py`
 - `jobs/spark/03_score_and_alert.py`
 - `jobs/spark/04_streaming_ml_pipeline.py`
@@ -161,11 +200,11 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - `docker-compose.simple.yml`
 
 ## Siguiente bloque recomendado
-1. Capturar este resultado para la memoria: canvas NiFi, topic `datos_filtrados`, tabla `logistica.stg_weather_open_meteo`, tabla `logistica.dim_ports_routes_weather` y sus parquet en HDFS.
-2. Conectar `dim_ports_routes_weather` con `fact_route_risk` o `fact_alerts` para construir una fact table operativa final.
-3. Ejecutar y documentar al menos un job Spark en YARN.
-4. Cerrar el caso Cassandra de baja latencia y ajustar streaming a ventanas de 15 minutos.
-5. Afinar Airflow para orquestar este flujo y sus dependencias.
+1. Capturar para la memoria toda la cadena validada: NiFi -> `datos_filtrados` -> `stg_weather_open_meteo` -> `dim_ports_routes_weather` -> `fact_weather_operational` y el pipeline legacy `stg_ships` -> `fact_route_risk` -> `fact_alerts`, incluyendo dimensiones maestras Hive.
+2. Ejecutar y documentar al menos un job Spark en YARN.
+3. Afinar Airflow para cubrir reentrenamiento mensual y alertas de fallo de forma mas defendible.
+4. Preparar una ejecucion demostrable coherente con la estrategia de micro-batch documentado.
+5. Completar capturas finales y memoria tecnica usando la checklist ya documentada.
 
 ## Regla de mantenimiento
 - Cada vez que se cierre un bloque de trabajo relevante, actualizar este archivo con:

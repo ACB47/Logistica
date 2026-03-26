@@ -79,6 +79,24 @@ def create_keyspace_and_tables():
         )
     """)
 
+    session.execute("""
+        CREATE TABLE IF NOT EXISTS vehicle_latest_state (
+            ship_id text PRIMARY KEY,
+            event_ts timestamp,
+            route_id text,
+            origin_port text,
+            dest_port text,
+            warehouse text,
+            lat double,
+            lon double,
+            speed_kn double,
+            heading double,
+            stock_on_hand int,
+            reorder_point int,
+            updated_at timestamp
+        )
+    """)
+
     print("OK - Cassandra keyspace y tablas creadas")
 
     result = session.execute("SELECT table_name FROM system_schema.tables WHERE keyspace_name = %s", [KEYSPACE])

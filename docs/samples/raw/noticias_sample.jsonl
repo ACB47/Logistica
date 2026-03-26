@@ -1,0 +1,2 @@
+{"event_type":"news_alert","ts":"2026-03-26T18:43:00","source":"news_monitor","severity":4,"region":"Estrecho de Gibraltar","text":"Congestion puntual por inspecciones extraordinarias en terminal","confidence":0.91}
+{"event_type":"news_alert","ts":"2026-03-26T18:48:00","source":"news_monitor","severity":2,"region":"Costa Mediterranea","text":"Retrasos menores por acumulacion de trafico portuario","confidence":0.79}

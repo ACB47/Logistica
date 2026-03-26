@@ -236,6 +236,20 @@ cd /home/hadoop/PROYECTOLOGISTICA
 spark-submit --master yarn --deploy-mode client jobs/spark/01_raw_to_staging.py
 ```
 
+**Ejecución del job meteorológico validado en YARN**:
+
+```bash
+cd /home/hadoop/PROYECTOLOGISTICA
+bash scripts/50_start_standalone.sh
+bash scripts/64_run_weather_filtered_staging_yarn.sh
+```
+
+Comando directo equivalente:
+
+```bash
+spark-submit --master yarn --deploy-mode client --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 jobs/spark/01_weather_filtered_to_staging.py --bootstrap master:9092 --topic datos_filtrados
+```
+
 **Verificación en HDFS (evidencia)**:
 
 ```bash
@@ -253,6 +267,12 @@ Tablas maestras (ejemplos):
 - `dim_skus` (lead time, criticidad)
 
 **Justificación**: joins reproducibles, gobernanza SQL.
+
+**Evidencias sugeridas**:
+- `logistica.dim_ports`
+- `logistica.dim_routes`
+- `logistica.dim_warehouse`
+- `logistica.dim_ports_routes_weather`
 
 ---
 
@@ -276,6 +296,10 @@ Tablas maestras (ejemplos):
 ---
 
 ## 7. Minería y acción (KDD – Minería/Interpretación): reglas + scoring de riesgo
+
+Decisión de defensa:
+- La entrega se defenderá como `micro-batch documentado`.
+- Structured Streaming queda implementado y alineado a ventanas de `15 minutes`, pero se presenta como evidencia técnica complementaria para reducir riesgo operativo en la demo.
 
 ### 7.1 Scoring de riesgo (sin streaming estructurado)
 
@@ -347,6 +371,89 @@ Sección a completar con diagrama:
 - Hive: tablas raw/staging/curated.
 - GraphFrames: salida (rutas/riesgo).
 - Airflow: DAG + runs.
+
+### 9.1 Checklist exacto de evidencias operativas
+
+**Kafka**
+
+```bash
+kafka-topics.sh --bootstrap-server master:9092 --list
+kafka-topics.sh --bootstrap-server master:9092 --describe --topic datos_crudos
+kafka-topics.sh --bootstrap-server master:9092 --describe --topic datos_filtrados
+```
+
+Capturar:
+- topics visibles
+- detalle de `datos_crudos`
+- detalle de `datos_filtrados`
+
+**NiFi**
+- captura del canvas completo
+- captura de `InvokeHTTP`
+- captura de `PublishKafka`
+- referencia al export: `docs/nifi/OpenMeteo_Kafka_Flow.json`
+
+**HDFS**
+
+```bash
+hdfs dfs -ls -R /hadoop/logistica/raw
+hdfs dfs -ls -R /hadoop/logistica/staging
+hdfs dfs -ls -R /hadoop/logistica/curated
+hdfs dfs -ls -R /hadoop/logistica/master
+```
+
+Capturar al menos:
+- `stg_weather_open_meteo`
+- `dim_ports_routes_weather`
+- `fact_weather_operational`
+- `fact_route_risk`
+- `fact_graph_centrality`
+
+**Hive / Spark SQL**
+
+```bash
+spark-sql -e "SHOW TABLES IN logistica"
+spark-sql -e "SELECT * FROM logistica.stg_weather_open_meteo ORDER BY event_ts DESC LIMIT 5"
+spark-sql -e "SELECT * FROM logistica.dim_ports_routes_weather ORDER BY event_ts DESC LIMIT 5"
+spark-sql -e "SELECT * FROM logistica.fact_weather_operational ORDER BY event_ts DESC LIMIT 5"
+spark-sql -e "SELECT * FROM logistica.fact_alerts ORDER BY severity DESC LIMIT 5"
+spark-sql -e "SELECT * FROM logistica.fact_graph_centrality ORDER BY degree DESC LIMIT 5"
+```
+
+**Cassandra**
+
+```bash
+cqlsh -e "SELECT ship_id, route_id, dest_port, warehouse, stock_on_hand, reorder_point FROM logistica.vehicle_latest_state;"
+```
+
+**YARN**
+
+```bash
+bash scripts/50_start_standalone.sh
+bash scripts/64_run_weather_filtered_staging_yarn.sh
+```
+
+Capturar:
+- terminal del `spark-submit`
+- ResourceManager UI
+- tabla `logistica.stg_weather_open_meteo` despues del job
+
+**Airflow**
+- DAG `logistica_kdd_microbatch`
+- DAG `logistica_kdd_monthly_retrain`
+- vista Graph
+- un run exitoso
+- si es posible, un reintento
+
+### 9.2 Guion corto de demo final
+
+1. Mostrar NiFi recibiendo API publica y enviando a Kafka.
+2. Mostrar Kafka con `datos_crudos` y `datos_filtrados`.
+3. Mostrar Hive staging y dimensiones.
+4. Mostrar fact table operativa del clima.
+5. Mostrar grafo y criticidad de nodos.
+6. Mostrar Cassandra con `vehicle_latest_state`.
+7. Mostrar Airflow orquestando el flujo.
 
 ---
 

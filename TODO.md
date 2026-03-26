@@ -81,28 +81,30 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 ## 4. Fase III - Mineria y accion
 ### Structured Streaming
 - [x] Existe `jobs/spark/04_streaming_ml_pipeline.py` con `readStream` y `writeStream`.
-- [ ] Ajustar las ventanas a `15 minutes`, porque el enunciado lo pide explicitamente y ahora el codigo usa `5 minutes`.
+- [x] Ajustar las ventanas a `15 minutes`, porque el enunciado lo pide explicitamente y ahora el codigo usa `5 minutes`.
 - [ ] Verificar que el pipeline streaming realmente corre en el entorno final elegido.
-- [ ] Definir si la entrega final usa:
+- [x] Definir si la entrega final usa:
   - streaming real con Structured Streaming, o
   - micro-batch documentado como aproximacion.
+- [x] Decidir defensa por `micro-batch documentado` para reducir riesgo operativo, manteniendo streaming real como evidencia tecnica complementaria.
 - [ ] Si se defiende streaming real, integrar ese job en la operativa principal y no dejarlo solo como codigo aislado.
 
 ### Persistencia multicapa
 - [x] Hive se usa para staging y facts historicos.
 - [x] Cassandra tiene setup y tablas creadas.
-- [ ] Implementar el caso de uso exigido para Cassandra: ultimo estado conocido de cada vehiculo para consultas de baja latencia.
-- [ ] Revisar el modelo Cassandra actual para que responda a preguntas reales de negocio y no solo a metricas agregadas.
-- [ ] Validar escrituras reales en Cassandra desde Spark o desde un proceso dedicado.
-- [ ] Preparar consultas de demostracion en Cassandra para la defensa.
+- [x] Implementar el caso de uso exigido para Cassandra: ultimo estado conocido de cada vehiculo para consultas de baja latencia.
+- [x] Revisar el modelo Cassandra actual para que responda a preguntas reales de negocio y no solo a metricas agregadas.
+- [x] Validar escrituras reales en Cassandra desde Spark o desde un proceso dedicado.
+- [x] Preparar consultas de demostracion en Cassandra para la defensa.
 
 ### ML, reglas y accion operativa
 - [x] Hay scoring y recomendaciones en `jobs/spark/03_score_and_alert.py`.
 - [x] Hay un pipeline ML experimental en `jobs/spark/04_streaming_ml_pipeline.py`.
-- [ ] Decidir el enfoque final que se va a defender:
+- [x] Decidir el enfoque final que se va a defender:
   - reglas de negocio + grafo.
   - ML + grafo.
   - enfoque hibrido.
+- [x] Enfoque final elegido: reglas de negocio + grafo para la defensa; ML queda como evidencia experimental complementaria.
 - [ ] Asegurar que el modelo o scoring final tenga entradas, salida y criterio de evaluacion claros.
 - [ ] Integrar el envio de alertas email con configuracion segura por `.env` o variables de entorno.
 - [ ] Probar y evidenciar al menos una alerta real generada de punta a punta.
@@ -110,15 +112,15 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 ## 5. Fase IV - Orquestacion con Airflow
 - [x] Existe `airflow/dags/logistica_kdd_dag.py`.
 - [x] El DAG ya tiene dependencias y reintentos basicos.
-- [ ] Adaptar el DAG al requisito del enunciado: reentrenamiento mensual del modelo de grafos y limpieza de tablas temporales HDFS.
-- [ ] Separar tareas del DAG para que reflejen mejor el ciclo KDD:
+- [x] Adaptar el DAG al requisito del enunciado: reentrenamiento mensual del modelo de grafos y limpieza de tablas temporales HDFS.
+- [x] Separar tareas del DAG para que reflejen mejor el ciclo KDD:
   - ingest/landing.
   - staging.
   - dimensiones.
   - grafo.
   - scoring.
   - limpieza.
-- [ ] Añadir manejo de fallo mas visible: email, log estructurado o callback de error.
+- [x] Añadir manejo de fallo mas visible: email, log estructurado o callback de error.
 - [ ] Verificar el DAG en la version final de Airflow que se vaya a presentar.
 - [ ] Preparar evidencias: vista Graph, run exitoso y al menos un reintento.
 
@@ -126,7 +128,7 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [ ] Ejecutar al menos un job Spark real sobre YARN, porque el enunciado lo pide explicitamente.
 - [ ] Guardar comando exacto y evidencia de ejecucion en cluster.
 - [ ] Verificar ResourceManager UI y consumo de recursos.
-- [ ] Alinear scripts y documentacion para que la ruta YARN sea reproducible.
+- [x] Alinear scripts y documentacion para que la ruta YARN sea reproducible.
 
 ## 7. Calidad, pruebas y validacion final
 - [ ] Crear un bloque minimo de validaciones reproducibles:
@@ -145,6 +147,7 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [ ] Completar la memoria siguiendo el ciclo KDD completo.
 - [ ] Incluir diagrama de arquitectura final.
 - [ ] Incluir justificacion tecnica de cada tecnologia usada.
+- [x] Preparar checklist exacto de evidencias y comandos para la memoria/demo.
 - [ ] Incluir capturas obligatorias:
   - HDFS.
   - YARN.

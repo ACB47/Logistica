@@ -4,13 +4,6 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, current_timestamp, lit, round as sql_round, when
 
 
-PORT_ROUTE_REFERENCE = [
-    ("Algeciras", "Shanghai", "route-shanghai-algeciras", "Valladolid", 120, 80),
-    ("Valencia", "Shanghai", "route-shanghai-valencia", "Valladolid", 140, 90),
-    ("Barcelona", "Shanghai", "route-shanghai-barcelona", "Valladolid", 135, 85),
-]
-
-
 def main() -> None:
     spark = (
         SparkSession.builder.appName("logistica-02-weather-port-enrichment")
@@ -23,9 +16,32 @@ def main() -> None:
     spark.sql("CREATE DATABASE IF NOT EXISTS logistica")
 
     weather = spark.table("logistica.stg_weather_open_meteo")
-    route_context = spark.createDataFrame(
-        PORT_ROUTE_REFERENCE,
-        ["port_ref", "origin_port", "route_id", "warehouse", "stock_on_hand", "reorder_point"],
+    dim_routes = spark.table("logistica.dim_routes")
+    dim_ports = spark.table("logistica.dim_ports")
+    dim_warehouse = spark.table("logistica.dim_warehouse")
+
+    route_context = (
+        dim_routes.alias("r")
+        .join(dim_ports.alias("p"), col("r.dest_port") == col("p.port_name"), "left")
+        .crossJoin(dim_warehouse.alias("w"))
+        .select(
+            col("p.port_name").alias("port_ref"),
+            col("r.origin_port"),
+            col("r.route_id"),
+            col("w.warehouse_name").alias("warehouse"),
+            when(col("p.port_name") == lit("Algeciras"), lit(120))
+            .when(col("p.port_name") == lit("Valencia"), lit(140))
+            .otherwise(lit(135))
+            .alias("stock_on_hand"),
+            when(col("p.port_name") == lit("Algeciras"), lit(80))
+            .when(col("p.port_name") == lit("Valencia"), lit(90))
+            .otherwise(lit(85))
+            .alias("reorder_point"),
+            col("p.port_id"),
+            col("w.warehouse_id"),
+            col("r.sea_hours_estimate"),
+            col("r.inland_hours_estimate"),
+        )
     )
 
     enriched = (

@@ -3,11 +3,10 @@ from __future__ import annotations
 import json
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
-    avg, col, count, from_json, lit, stddev, sum as sql_sum,
-    current_timestamp, when, window, udf
+    avg, col, count, from_json, lit, stddev, to_timestamp, when, window, udf
 )
 from pyspark.sql.types import (
-    DoubleType, IntegerType, StringType, StructField, StructType, TimestampType
+    DoubleType, IntegerType, StringType, StructField, StructType
 )
 from pyspark.ml.classification import RandomForestClassificationModel, RandomForestClassifier
 from pyspark.ml.feature import VectorAssembler, StringIndexer
@@ -55,8 +54,9 @@ def main() -> None:
     spark = (
         SparkSession.builder
         .appName("logistica-streaming-ml")
-        .config("spark.sql.warehouse.dir", "hdfs:///hadoop/logistica/warehouse")
-        .config("spark.sql.streaming.checkpointLocation", "hdfs:///hadoop/logistica/checkpoint")
+        .config("spark.hadoop.fs.defaultFS", "hdfs://namenode:8020")
+        .config("spark.sql.warehouse.dir", "hdfs://namenode:8020/user/hive/warehouse")
+        .config("spark.sql.streaming.checkpointLocation", "hdfs://namenode:8020/hadoop/logistica/checkpoint")
         .config("spark.cassandra.connection.host", "cassandra")
         .enableHiveSupport()
         .getOrCreate()
@@ -77,6 +77,8 @@ def main() -> None:
         kafka_df.select(from_json(col("value").cast("string"), SHIP_SCHEMA).alias("data"))
         .select("data.*")
         .filter(col("event_type") == "ship_position")
+        .withColumn("event_ts", to_timestamp(col("ts")))
+        .dropna(subset=["event_ts", "ship_id", "dest_port", "route_id"])
     )
 
     alerts_kafka_df = (
@@ -91,13 +93,15 @@ def main() -> None:
     alerts_df = (
         alerts_kafka_df.select(from_json(col("value").cast("string"), ALERT_SCHEMA).alias("data"))
         .select("data.*")
+        .withColumn("event_ts", to_timestamp(col("ts")))
+        .dropna(subset=["event_ts", "region", "source"])
     )
 
     windowed_ships = (
         ships_df
-        .withWatermark("ts", "30 seconds")
+        .withWatermark("event_ts", "15 minutes")
         .groupBy(
-            window(col("ts").cast(TimestampType()), "5 minutes"),
+            window(col("event_ts"), "15 minutes"),
             col("dest_port"),
             col("route_id")
         )
@@ -112,9 +116,9 @@ def main() -> None:
 
     windowed_alerts = (
         alerts_df
-        .withWatermark("ts", "1 minute")
+        .withWatermark("event_ts", "15 minutes")
         .groupBy(
-            window(col("ts").cast(TimestampType()), "5 minutes"),
+            window(col("event_ts"), "15 minutes"),
             col("region"),
             col("source")
         )
@@ -138,7 +142,7 @@ def main() -> None:
         .writeStream
         .foreachBatch(write_to_cassandra_ml)
         .outputMode("append")
-        .option("checkpointLocation", "hdfs:///hadoop/logistica/checkpoint/ships")
+        .option("checkpointLocation", "hdfs://namenode:8020/hadoop/logistica/checkpoint/ships")
         .start()
     )
 
@@ -155,7 +159,7 @@ def main() -> None:
         .writeStream
         .foreachBatch(write_alerts_to_cassandra)
         .outputMode("append")
-        .option("checkpointLocation", "hdfs:///hadoop/logistica/checkpoint/alerts")
+        .option("checkpointLocation", "hdfs://namenode:8020/hadoop/logistica/checkpoint/alerts")
         .start()
     )
 

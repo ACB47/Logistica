@@ -10,7 +10,8 @@ from pyspark.sql.types import IntegerType, StringType, StructField, StructType
 def main() -> None:
     spark = (
         SparkSession.builder.appName("logistica-03-score-and-alert")
-        .config("spark.sql.warehouse.dir", "hdfs:///hadoop/logistica/warehouse")
+        .config("spark.hadoop.fs.defaultFS", "hdfs://namenode:8020")
+        .config("spark.sql.warehouse.dir", "hdfs://namenode:8020/user/hive/warehouse")
         .enableHiveSupport()
         .getOrCreate()
     )
@@ -103,7 +104,7 @@ def main() -> None:
     (
         alerts_final.write.mode("overwrite")
         .format("parquet")
-        .option("path", "hdfs:///hadoop/logistica/curated/fact_alerts")
+        .option("path", "hdfs://namenode:8020/hadoop/logistica/curated/fact_alerts")
         .saveAsTable("logistica.fact_alerts")
     )
 
@@ -115,4 +116,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

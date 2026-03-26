@@ -50,6 +50,17 @@ El proyecto está **completamente dockerizado** para ejecutarse en cualquier ord
 - Export reutilizable del canvas:
   - `docs/nifi/OpenMeteo_Kafka_Flow.json`
 
+## Ruta YARN recomendada
+
+- Arranque base en master/standalone:
+  - `bash scripts/50_start_standalone.sh`
+- Job validado para presentar en YARN:
+  - `bash scripts/64_run_weather_filtered_staging_yarn.sh`
+- Comando equivalente:
+```bash
+spark-submit --master yarn --deploy-mode client --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 jobs/spark/01_weather_filtered_to_staging.py --bootstrap master:9092 --topic datos_filtrados
+```
+
 ## Stack tecnológico (rúbrica cumplida)
 
 | Componente | Implementación |
