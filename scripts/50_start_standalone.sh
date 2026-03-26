@@ -4,15 +4,35 @@ set -euo pipefail
 # Arranque simplificado en standalone (solo master, sin cluster de slaves).
 # Levanta: HDFS, YARN (opcional), Hive Metastore, Kafka local y Airflow.
 
-PROJECT_HOME="${PROJECT_HOME:-/home/hadoop/PROYECTOLOGISTICA}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_HOME="${PROJECT_HOME:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
+HADOOP_HOME="${HADOOP_HOME:-/home/hadoop/hadoop}"
+HIVE_HOME="${HIVE_HOME:-/home/hadoop/hive}"
 KAFKA_HOME="${KAFKA_HOME:-/home/hadoop/Descargas/kafka_2.13-4.1.1}"
+AIRFLOW_VENV="${AIRFLOW_VENV:-${PROJECT_HOME}/.venv-airflow}"
+AIRFLOW_HOME_DIR="${AIRFLOW_HOME_DIR:-${PROJECT_HOME}/.airflow}"
+
+require_path() {
+  local path="$1"
+  local message="$2"
+  if [[ ! -e "${path}" ]]; then
+    echo "ERROR: ${message}: ${path}"
+    exit 1
+  fi
+}
+
+require_path "${PROJECT_HOME}" "PROJECT_HOME no existe"
+require_path "${HADOOP_HOME}/sbin/start-dfs.sh" "No se encontro Hadoop"
+require_path "${HIVE_HOME}/bin/hive" "No se encontro Hive"
+require_path "${KAFKA_HOME}/bin/kafka-topics.sh" "No se encontro Kafka"
+require_path "${AIRFLOW_VENV}/bin/activate" "No se encontro el virtualenv de Airflow"
 
 echo "== 1) HDFS/YARN =="
-/home/hadoop/hadoop/sbin/start-dfs.sh
-/home/hadoop/hadoop/sbin/start-yarn.sh || true
+"${HADOOP_HOME}/sbin/start-dfs.sh"
+"${HADOOP_HOME}/sbin/start-yarn.sh" || true
 
 echo "== 2) Hive Metastore =="
-nohup /home/hadoop/hive/bin/hive --service metastore > /tmp/hive_metastore_master.log 2>&1 &
+nohup "${HIVE_HOME}/bin/hive" --service metastore > /tmp/hive_metastore_master.log 2>&1 &
 
 echo "== 3) Kafka local =="
 mkdir -p /tmp/kafka_pids
@@ -26,8 +46,8 @@ fi
 
 echo "== 4) Airflow =="
 cd "$PROJECT_HOME"
-source .venv-airflow/bin/activate
-export AIRFLOW_HOME="$PROJECT_HOME/.airflow"
+source "${AIRFLOW_VENV}/bin/activate"
+export AIRFLOW_HOME="${AIRFLOW_HOME_DIR}"
 mkdir -p "$AIRFLOW_HOME"
 rm -rf "$AIRFLOW_HOME/dags"
 ln -s "$PROJECT_HOME/airflow/dags" "$AIRFLOW_HOME/dags"

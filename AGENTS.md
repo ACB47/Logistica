@@ -49,7 +49,6 @@ Guidance for coding agents working in this repository.
 - Spark raw-to-staging: `spark-submit jobs/spark/01_raw_to_staging.py`
 - Spark master dimensions: `spark-submit jobs/spark/01_load_master_dimensions.py`
 - Spark weather filtered-to-staging: `spark-submit jobs/spark/01_weather_filtered_to_staging.py --bootstrap kafka:9092 --topic datos_filtrados`
-- Spark weather filtered-to-staging on YARN: `bash scripts/64_run_weather_filtered_staging_yarn.sh`
 - Spark weather-port enrichment: `spark-submit jobs/spark/02_weather_port_enrichment.py`
 - Spark weather operational fact: `spark-submit jobs/spark/03_weather_operational_fact.py`
 - Spark latest vehicle state to Cassandra: `bash scripts/65_load_vehicle_latest_state_cassandra.sh`

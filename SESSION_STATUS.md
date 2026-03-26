@@ -9,7 +9,7 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 ## Resumen ejecutivo
 - El proyecto ya tiene una base funcional de demo: productores Kafka, landing raw en HDFS, jobs Spark batch, tablas Hive, soporte Cassandra, notebooks Zeppelin y un DAG de Airflow.
 - El proyecto aun no esta cerrado respecto al enunciado final 2025-2026.
-- Ya se inicio la alineacion del stack Docker: Kafka paso a KRaft en Compose, NiFi subio a `2.6.0`, Cassandra a `5.0`, y se documento que la ruta oficial de entrega es la de cluster/VM; Docker queda como demo local.
+- Ya se inicio la alineacion del stack Docker: Kafka paso a KRaft en Compose, NiFi subio a `2.6.0`, Cassandra a `5.0`, y la ruta oficial de entrega queda fijada en Docker/local.
 - NiFi si esta presente en Docker y ahora hay un script de gestion por perfiles para evitar levantar todo el stack cuando no hace falta: `scripts/60_manage_docker_stack.sh`.
 - Se probo `simple core`, pero el arranque quedo bloqueado por falta de espacio en disco en la maquina host.
 - Se libero espacio en disco eliminando cache Docker, cache de `pip` y backends pesados de LM Studio.
@@ -28,11 +28,10 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - Los jobs legacy de staging, grafos y alertas ya vuelven a funcionar con HDFS explicito en `hdfs://namenode:8020`.
 - Ya existen dimensiones maestras reales en Hive para puertos, rutas, almacen y SKU: `dim_ports`, `dim_routes`, `dim_warehouse`, `dim_skus`.
 - GraphFrames ya cubre una segunda metrica defendible: criticidad por grado en `logistica.fact_graph_centrality`.
-- La ruta YARN ya queda preparada y documentada para el job meteorologico con `scripts/64_run_weather_filtered_staging_yarn.sh`.
 - El caso Cassandra de baja latencia ya queda cubierto con `logistica.vehicle_latest_state` y el loader `scripts/65_load_vehicle_latest_state_cassandra.sh`.
 - El pipeline streaming ya queda alineado al enunciado en ventanas de `15 minutes` y con checkpoints HDFS explicitos.
 - La estrategia de defensa ya queda decidida: `micro-batch documentado` como camino principal, con streaming real como evidencia complementaria.
-- Lo mas importante pendiente ahora es NiFi real con API publica, YARN, topic filtrado, streaming/ventanas de 15 minutos, caso real de Cassandra y documentacion final.
+- Lo mas importante pendiente ahora es cerrar evidencias, Airflow visual, narrativa final de defensa y documentacion completa sobre la ruta Docker/local.
 
 ## Estado por fases KDD
 
@@ -164,15 +163,16 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - NiFi en Docker ya esta alineado a la version objetivo, pero sigue faltando un flujo real configurado.
 - Airflow en Docker principal no esta alineado claramente con 2.10.x.
 - Cassandra Docker ya esta en 5.0; falta validar compatibilidad en una ejecucion real.
-- Falta evidenciar YARN en la ruta principal de ejecucion.
 - Falta separar `datos_crudos` y `datos_filtrados`.
 - El job de streaming usa ventanas de 5 minutos, no 15.
 - En Docker full, HDFS ya escribe correctamente; ahora el punto a vigilar es no perder mensajes de Kafka al recrear el broker durante pruebas.
 - El bloqueo por espacio en disco ya no aplica: `/` volvio a tener margen libre suficiente tras la limpieza.
 
 ## Decision de arquitectura actual
-- Ruta oficial de entrega: cluster/VM con HDFS + YARN + Kafka KRaft + Spark + Hive + Cassandra + Airflow + NiFi.
-- Ruta Docker: demo local y validacion rapida del stack, no sustituto completo de la defensa de la rubrica.
+- Ruta oficial de entrega: Docker/local con HDFS + Kafka KRaft + Spark + Hive + Cassandra + Airflow + NiFi.
+- `docker-compose.yml`: stack completo para la demo final.
+- `docker-compose.simple.yml`: validacion rapida y sesiones ligeras.
+- No se usaran maquinas virtuales en la entrega final.
 - Esta decision ya esta reflejada tambien en `README.md`.
 
 ## Archivos clave para retomar
@@ -182,7 +182,6 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - `scripts/60_manage_docker_stack.sh`
 - `scripts/61_nifi_healthcheck.sh`
 - `scripts/63_run_weather_filtered_staging.sh`
-- `scripts/64_run_weather_filtered_staging_yarn.sh`
 - `scripts/65_load_vehicle_latest_state_cassandra.sh`
 - `docs/00_documento_word.md`
 - `docs/01_nifi_open_meteo_flow.md`
@@ -201,10 +200,10 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 
 ## Siguiente bloque recomendado
 1. Capturar para la memoria toda la cadena validada: NiFi -> `datos_filtrados` -> `stg_weather_open_meteo` -> `dim_ports_routes_weather` -> `fact_weather_operational` y el pipeline legacy `stg_ships` -> `fact_route_risk` -> `fact_alerts`, incluyendo dimensiones maestras Hive.
-2. Ejecutar y documentar al menos un job Spark en YARN.
-3. Afinar Airflow para cubrir reentrenamiento mensual y alertas de fallo de forma mas defendible.
-4. Preparar una ejecucion demostrable coherente con la estrategia de micro-batch documentado.
-5. Completar capturas finales y memoria tecnica usando la checklist ya documentada.
+2. Afinar Airflow para cubrir reentrenamiento mensual y alertas de fallo de forma mas defendible.
+3. Preparar una ejecucion demostrable coherente con la estrategia de micro-batch documentado.
+4. Completar capturas finales y memoria tecnica usando la checklist ya documentada.
+5. Dejar una ruta oficial de demo desde Docker completamente ensayada.
 
 ## Regla de mantenimiento
 - Cada vez que se cierre un bloque de trabajo relevante, actualizar este archivo con:

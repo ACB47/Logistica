@@ -125,10 +125,7 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [ ] Preparar evidencias: vista Graph, run exitoso y al menos un reintento.
 
 ## 6. YARN y ejecucion distribuida
-- [ ] Ejecutar al menos un job Spark real sobre YARN, porque el enunciado lo pide explicitamente.
-- [ ] Guardar comando exacto y evidencia de ejecucion en cluster.
-- [ ] Verificar ResourceManager UI y consumo de recursos.
-- [x] Alinear scripts y documentacion para que la ruta YARN sea reproducible.
+- [ ] Documentar en la memoria que la entrega final no usa YARN/VMs y justificar la ruta Docker/local elegida.
 
 ## 7. Calidad, pruebas y validacion final
 - [ ] Crear un bloque minimo de validaciones reproducibles:
@@ -150,7 +147,6 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [x] Preparar checklist exacto de evidencias y comandos para la memoria/demo.
 - [ ] Incluir capturas obligatorias:
   - HDFS.
-  - YARN.
   - Kafka topics.
   - NiFi canvas.
   - Hive tablas.
@@ -168,8 +164,8 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 
 ## 10. Cierre operativo del proyecto
 - [ ] Definir una ruta oficial de ejecucion desde cero.
-- [ ] Probar esa ruta en limpio en la maquina final o en las VMs finales.
-- [ ] Resolver incoherencias entre Docker, scripts standalone y cluster de 3 VMs.
+- [ ] Probar esa ruta en limpio en la maquina final.
+- [x] Resolver incoherencias entre Docker, scripts standalone y cluster de 3 VMs dejando Docker/local como ruta oficial.
 - [ ] Confirmar que todos los comandos del README funcionan o actualizarlos.
 - [ ] Dejar una checklist de entrega final marcada con fecha.
 

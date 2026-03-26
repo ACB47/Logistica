@@ -34,9 +34,10 @@ El proyecto está **completamente dockerizado** para ejecutarse en cualquier ord
 
 ## Ruta recomendada de entrega
 
-- Ruta oficial para la memoria y la defensa: entorno tipo cluster/VM con HDFS, YARN, Kafka KRaft, Spark, Hive, Cassandra, Airflow y NiFi.
-- Ruta Docker (`docker-compose.yml` y `docker-compose.simple.yml`): demo local y validacion rapida del stack.
-- Si hay diferencias entre ambas rutas, la implementacion que se ensena en la entrega debe priorizar la ruta oficial de la rubrica.
+- Ruta oficial para la memoria y la defensa: Docker/local con HDFS, Kafka KRaft, Spark, Hive, Cassandra, Airflow y NiFi.
+- `docker-compose.yml`: stack completo para la demo final.
+- `docker-compose.simple.yml`: validacion rapida y sesiones ligeras.
+- No se usaran maquinas virtuales en la entrega final.
 
 ## NiFi - primer flujo real
 
@@ -50,23 +51,21 @@ El proyecto está **completamente dockerizado** para ejecutarse en cualquier ord
 - Export reutilizable del canvas:
   - `docs/nifi/OpenMeteo_Kafka_Flow.json`
 
-## Ruta YARN recomendada
+## Ruta de demo recomendada
 
-- Arranque base en master/standalone:
-  - `bash scripts/50_start_standalone.sh`
-- Job validado para presentar en YARN:
-  - `bash scripts/64_run_weather_filtered_staging_yarn.sh`
-- Comando equivalente:
-```bash
-spark-submit --master yarn --deploy-mode client --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 jobs/spark/01_weather_filtered_to_staging.py --bootstrap master:9092 --topic datos_filtrados
-```
+- Arranque ligero:
+  - `bash scripts/60_manage_docker_stack.sh start simple core`
+- Arranque completo:
+  - `bash scripts/63_run_weather_filtered_staging.sh full`
+- Carga Cassandra:
+  - `bash scripts/65_load_vehicle_latest_state_cassandra.sh`
 
 ## Stack tecnológico (rúbrica cumplida)
 
 | Componente | Implementación |
 |------------|----------------|
 | Kafka | Streaming de datos en tiempo real |
-| Spark Structured Streaming | Procesamiento streaming con ventanas de 5 min |
+| Spark Structured Streaming | Procesamiento streaming con ventanas de 15 min |
 | Cassandra | Persistencia NoSQL para métricas |
 | Hive | Tablas SQL (raw/staging/curated) |
 | Zeppelin | Notebooks de visualización |
@@ -99,7 +98,7 @@ Logistica/
 ## Pipeline KDD
 
 1. **Ingesta**: Productores Kafka envían datos GPS de barcos y alertas
-2. **Streaming**: Spark Structured Streaming procesa ventanas de 5 minutos
+2. **Streaming**: Spark Structured Streaming procesa ventanas de 15 minutos
 3. **ML**: Modelos de predicción (LinearRegression, RandomForest, K-Means)
 4. **Persistencia**: Cassandra + Hive
 5. **Alertas**: Email automático según severidad

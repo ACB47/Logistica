@@ -229,25 +229,22 @@ hdfs dfs -ls -R /hadoop/logistica/raw/noticias | head
 - Ejecución de un job Spark en YARN.
 - Tabla staging en Hive.
 
-**Ejecución del job 01 (ejemplo)**:
+**Ejecución del job 01 (ejemplo local/docker)**:
 
 ```bash
-cd /home/hadoop/PROYECTOLOGISTICA
-spark-submit --master yarn --deploy-mode client jobs/spark/01_raw_to_staging.py
+docker-compose exec -T spark spark-submit /home/jovyan/jobs/spark/01_raw_to_staging.py
 ```
 
-**Ejecución del job meteorológico validado en YARN**:
+**Ejecución del job meteorológico validado en Docker**:
 
 ```bash
-cd /home/hadoop/PROYECTOLOGISTICA
-bash scripts/50_start_standalone.sh
-bash scripts/64_run_weather_filtered_staging_yarn.sh
+bash scripts/63_run_weather_filtered_staging.sh full
 ```
 
 Comando directo equivalente:
 
 ```bash
-spark-submit --master yarn --deploy-mode client --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 jobs/spark/01_weather_filtered_to_staging.py --bootstrap master:9092 --topic datos_filtrados
+docker-compose exec -T spark spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 /home/jovyan/jobs/spark/01_weather_filtered_to_staging.py --bootstrap kafka:9092 --topic datos_filtrados
 ```
 
 **Verificación en HDFS (evidencia)**:
@@ -363,10 +360,7 @@ Sección a completar con diagrama:
 
 ## 9. Evidencias y capturas (checklist)
 
-- VirtualBox: 3 VMs (nombres correctos).
-- Red: ping + /etc/hosts.
 - HDFS: UIs + `hdfs dfs -ls`.
-- YARN: UI + Spark job en cluster.
 - Kafka KRaft: topics creados + describe.
 - Hive: tablas raw/staging/curated.
 - GraphFrames: salida (rutas/riesgo).
@@ -377,9 +371,9 @@ Sección a completar con diagrama:
 **Kafka**
 
 ```bash
-kafka-topics.sh --bootstrap-server master:9092 --list
-kafka-topics.sh --bootstrap-server master:9092 --describe --topic datos_crudos
-kafka-topics.sh --bootstrap-server master:9092 --describe --topic datos_filtrados
+docker-compose exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
+docker-compose exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --describe --topic datos_crudos
+docker-compose exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --describe --topic datos_filtrados
 ```
 
 Capturar:
@@ -396,10 +390,10 @@ Capturar:
 **HDFS**
 
 ```bash
-hdfs dfs -ls -R /hadoop/logistica/raw
-hdfs dfs -ls -R /hadoop/logistica/staging
-hdfs dfs -ls -R /hadoop/logistica/curated
-hdfs dfs -ls -R /hadoop/logistica/master
+docker-compose exec -T namenode bash -lc '/opt/hadoop-3.2.1/bin/hdfs dfs -ls -R /hadoop/logistica/raw'
+docker-compose exec -T namenode bash -lc '/opt/hadoop-3.2.1/bin/hdfs dfs -ls -R /hadoop/logistica/staging'
+docker-compose exec -T namenode bash -lc '/opt/hadoop-3.2.1/bin/hdfs dfs -ls -R /hadoop/logistica/curated'
+docker-compose exec -T namenode bash -lc '/opt/hadoop-3.2.1/bin/hdfs dfs -ls -R /hadoop/logistica/master'
 ```
 
 Capturar al menos:
@@ -412,30 +406,28 @@ Capturar al menos:
 **Hive / Spark SQL**
 
 ```bash
-spark-sql -e "SHOW TABLES IN logistica"
-spark-sql -e "SELECT * FROM logistica.stg_weather_open_meteo ORDER BY event_ts DESC LIMIT 5"
-spark-sql -e "SELECT * FROM logistica.dim_ports_routes_weather ORDER BY event_ts DESC LIMIT 5"
-spark-sql -e "SELECT * FROM logistica.fact_weather_operational ORDER BY event_ts DESC LIMIT 5"
-spark-sql -e "SELECT * FROM logistica.fact_alerts ORDER BY severity DESC LIMIT 5"
-spark-sql -e "SELECT * FROM logistica.fact_graph_centrality ORDER BY degree DESC LIMIT 5"
+docker-compose exec -T spark spark-sql -e "SHOW TABLES IN logistica"
+docker-compose exec -T spark spark-sql -e "SELECT * FROM logistica.stg_weather_open_meteo ORDER BY event_ts DESC LIMIT 5"
+docker-compose exec -T spark spark-sql -e "SELECT * FROM logistica.dim_ports_routes_weather ORDER BY event_ts DESC LIMIT 5"
+docker-compose exec -T spark spark-sql -e "SELECT * FROM logistica.fact_weather_operational ORDER BY event_ts DESC LIMIT 5"
+docker-compose exec -T spark spark-sql -e "SELECT * FROM logistica.fact_alerts ORDER BY severity DESC LIMIT 5"
+docker-compose exec -T spark spark-sql -e "SELECT * FROM logistica.fact_graph_centrality ORDER BY degree DESC LIMIT 5"
 ```
 
 **Cassandra**
 
 ```bash
-cqlsh -e "SELECT ship_id, route_id, dest_port, warehouse, stock_on_hand, reorder_point FROM logistica.vehicle_latest_state;"
+docker-compose exec -T cassandra cqlsh -e "SELECT ship_id, route_id, dest_port, warehouse, stock_on_hand, reorder_point FROM logistica.vehicle_latest_state;"
 ```
 
-**YARN**
+**Spark job clave en Docker**
 
 ```bash
-bash scripts/50_start_standalone.sh
-bash scripts/64_run_weather_filtered_staging_yarn.sh
+bash scripts/63_run_weather_filtered_staging.sh full
 ```
 
 Capturar:
 - terminal del `spark-submit`
-- ResourceManager UI
 - tabla `logistica.stg_weather_open_meteo` despues del job
 
 **Airflow**
