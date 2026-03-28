@@ -151,8 +151,8 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
   - [x] Hive tablas base (`stg_weather_open_meteo`, `dim_ports_routes_weather`, `fact_weather_operational`).
   - [x] Cassandra consultas.
   - [x] HDFS curated.
-  - [ ] GraphFrames resultados.
-  - [ ] Airflow DAG.
+  - [x] GraphFrames resultados.
+  - [x] Airflow DAG.
 - [ ] Explicar claramente que parte esta implementada de verdad y que parte es simulada.
 - [ ] Redactar conclusiones, limitaciones y mejoras futuras.
 
@@ -176,7 +176,7 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [x] Staging y curated en Hive demostrables.
 - [x] Grafo y metricas defendibles demostrables.
 - [x] Persistencia Cassandra demostrable para baja latencia.
-- [ ] DAG Airflow ejecutado con exito y capturado.
+- [x] DAG Airflow ejecutado con exito y capturado.
 - [x] Al menos una alerta operativa generada y registrada.
 - [ ] Memoria completa con capturas.
 - [ ] Demo final ensayada.

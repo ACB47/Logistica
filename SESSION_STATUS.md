@@ -157,9 +157,10 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
     - Hive `fact_weather_operational`
     - Cassandra `vehicle_latest_state`
     - HDFS curated
+    - GraphFrames `fact_graph_centrality`
+    - Airflow: lista de DAGs + graph de `logistica_kdd_microbatch` + graph de `logistica_kdd_monthly_retrain`
 - Falta para cerrar:
   - memoria final completa
-  - capturas pendientes de GraphFrames y Airflow
   - narrativa clara de arquitectura final y limitaciones
   - guion de demo final
 
@@ -205,10 +206,10 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 
 ## Siguiente bloque recomendado
 1. Capturar para la memoria toda la cadena validada: NiFi -> `datos_filtrados` -> `stg_weather_open_meteo` -> `dim_ports_routes_weather` -> `fact_weather_operational` y el pipeline legacy `stg_ships` -> `fact_route_risk` -> `fact_alerts`, incluyendo dimensiones maestras Hive.
-2. Completar las capturas pendientes de GraphFrames y Airflow.
-3. Afinar Airflow para cubrir reentrenamiento mensual y alertas de fallo de forma mas defendible.
-4. Dejar una ruta oficial de demo desde Docker completamente ensayada.
-5. Revisar SMTP y la demostracion visual de alertas/Airflow antes del cierre.
+2. Afinar Airflow para cubrir reentrenamiento mensual y alertas de fallo de forma mas defendible.
+3. Dejar una ruta oficial de demo desde Docker completamente ensayada.
+4. Revisar SMTP y la demostracion visual de alertas/Airflow antes del cierre.
+5. Redactar la memoria final con las capturas ya reunidas.
 
 ## Regla de mantenimiento
 - Cada vez que se cierre un bloque de trabajo relevante, actualizar este archivo con:

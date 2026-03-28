@@ -375,7 +375,8 @@ Estado actual de capturas ya realizadas en esta sesion:
 - Hive: `stg_weather_open_meteo`, `dim_ports_routes_weather`, `fact_weather_operational`
 - Cassandra: `vehicle_latest_state`
 - HDFS curated: listado de `fact_weather_operational`, `fact_route_risk`, `fact_graph_centrality`
-- Pendientes visuales principales: GraphFrames por consulta dedicada y DAGs de Airflow con ejecucion
+- GraphFrames: `fact_graph_centrality`
+- Airflow: lista de DAGs + Graph de `logistica_kdd_microbatch` + Graph de `logistica_kdd_monthly_retrain`
 
 **Kafka**
 
@@ -450,9 +451,6 @@ Capturar:
 - vista Graph
 - un run exitoso
 - si es posible, un reintento
-
-Pendiente actual:
-- repetir acceso a la UI y capturar lista de DAGs y Graph view en esta tanda final
 
 ### 9.2 Guion corto de demo final
 
