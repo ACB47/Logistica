@@ -67,9 +67,6 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
   - Export del canvas NiFi disponible en `docs/nifi/OpenMeteo_Kafka_Flow.json`
   - Stack `simple core` reanudado con Kafka, NiFi y Postgres activos; Airflow vuelve a levantar tras recrear el contenedor
 - Falta para cerrar:
-  - flujo real con NiFi y API publica
-  - topic de `datos_filtrados`
-  - back-pressure y ruta de errores defendibles
   - evidencias finales de auditoria raw
 
 ### Fase II - Preprocesamiento y transformacion
@@ -115,7 +112,6 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
     - `Algeciras | degree 2 | NODO_CRITICO`
 - Falta para cerrar:
   - mejor cierre del caso de grafos para la defensa
-  - ejecutar esta ruta YARN en el entorno master/VM y guardar captura del ResourceManager
   - terminar de preparar o reutilizar `.venv-jobs` para ejecucion local con PySpark si se quiere correr fuera del cluster
 
 ### Fase III - Mineria y accion
@@ -152,6 +148,7 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
   - guia base: `docs/00_documento_word.md`
   - notebooks Zeppelin existentes en `zeppelin/`
   - checklist exacto de evidencias y comandos ya documentado en `docs/00_documento_word.md`
+  - ya hay evidencias manuales empezadas de NiFi, Kafka y Hive weather staging
 - Falta para cerrar:
   - memoria final completa
   - capturas obligatorias
@@ -201,9 +198,9 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 ## Siguiente bloque recomendado
 1. Capturar para la memoria toda la cadena validada: NiFi -> `datos_filtrados` -> `stg_weather_open_meteo` -> `dim_ports_routes_weather` -> `fact_weather_operational` y el pipeline legacy `stg_ships` -> `fact_route_risk` -> `fact_alerts`, incluyendo dimensiones maestras Hive.
 2. Afinar Airflow para cubrir reentrenamiento mensual y alertas de fallo de forma mas defendible.
-3. Preparar una ejecucion demostrable coherente con la estrategia de micro-batch documentado.
-4. Completar capturas finales y memoria tecnica usando la checklist ya documentada.
-5. Dejar una ruta oficial de demo desde Docker completamente ensayada.
+3. Completar capturas finales y memoria tecnica usando la checklist ya documentada.
+4. Dejar una ruta oficial de demo desde Docker completamente ensayada.
+5. Revisar SMTP y la demostracion visual de alertas/Airflow antes del cierre.
 
 ## Regla de mantenimiento
 - Cada vez que se cierre un bloque de trabajo relevante, actualizar este archivo con:

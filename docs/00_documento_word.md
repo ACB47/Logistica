@@ -226,7 +226,7 @@ hdfs dfs -ls -R /hadoop/logistica/raw/noticias | head
 - Normalización de timestamps/zonas horarias.
 
 **Capturas**:
-- Ejecución de un job Spark en YARN.
+- Ejecución de un job Spark en Docker.
 - Tabla staging en Hive.
 
 **Ejecución del job 01 (ejemplo local/docker)**:
@@ -337,10 +337,11 @@ Requisitos rúbrica:
 
 ### 8.2 Parámetros reales usados en esta entrega
 
-- `AIRFLOW_HOME`: `/home/hadoop/PROYECTOLOGISTICA/.airflow`
+- `AIRFLOW_HOME`: directorio `.airflow` del proyecto o volumen equivalente en Docker
 - Usuario UI: `admin` / `admin`
 - DAG cargado: `logistica_kdd_microbatch`
 - Versión validada en entorno: `apache-airflow==2.10.5`
+- Segundo DAG validado: `logistica_kdd_monthly_retrain`
 
 ### 8.3 NiFi (diseño a incluir en la memoria)
 
@@ -452,5 +453,5 @@ Capturar:
 ## 10. Conclusiones
 
 - Qué problemas resuelve.
-- Limitaciones (no Cassandra, no structured streaming).
+- Limitaciones (streaming real no defendido como ruta principal, Cassandra cargada en micro-batch, no despliegue en cluster/YARN para la entrega final).
 - Mejoras futuras (observabilidad, modelos ML más avanzados, etc.).

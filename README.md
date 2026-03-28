@@ -25,7 +25,7 @@ El proyecto está **completamente dockerizado** para ejecutarse en cualquier ord
 
 ### Kafka
 - Bootstrap: `localhost:9092`
-- Topics: `datos_crudos`, `alertas_globales`
+- Topics: `datos_crudos`, `datos_filtrados`, `alertas_globales`
 
 ### Detener
 ```bash
@@ -113,5 +113,5 @@ Logistica/
 ## Pendiente para cierre completo de entrega
 
 - [ ] Configurar credenciales SMTP en `.env`
-- [ ] Ejecutar `start.sh` y verificar todos los servicios
+- [ ] Verificar en Airflow la ejecucion visual de los dos DAGs finales
 - [ ] Completar documento Word con capturas finales

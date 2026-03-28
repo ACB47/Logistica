@@ -11,40 +11,40 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [ ] El proyecto todavia no cumple completamente el enunciado 2025-2026 tal como esta pedido.
 
 ## 1. Alinear versiones y arquitectura con la rubrica
-- [ ] Actualizar `docker-compose.yml` y `docker-compose.simple.yml` para acercarlos al stack exigido:
+- [x] Actualizar `docker-compose.yml` y `docker-compose.simple.yml` para acercarlos al stack exigido:
   - Kafka `3.9.1+` en modo KRaft.
   - NiFi `2.6.0+`.
   - Airflow `2.10.x` real en despliegue principal.
   - Cassandra `5.0+` si es viable en el entorno.
   - HDFS `3.4.2+` y uso claro de YARN.
-- [ ] Eliminar la dependencia de ZooKeeper en la ruta principal de ejecucion si la entrega final va a defender KRaft.
-- [ ] Decidir y documentar una arquitectura final unica: Docker demo, cluster 3 VMs, o ambas.
+- [x] Eliminar la dependencia de ZooKeeper en la ruta principal de ejecucion si la entrega final va a defender KRaft.
+- [x] Decidir y documentar una arquitectura final unica: Docker demo, cluster 3 VMs, o ambas.
 - [ ] Validar que el camino principal de ejecucion coincide con lo que se mostrara en la defensa.
 
 ## 2. Fase I - Ingesta y seleccion
 ### Fuentes y NiFi
-- [ ] Implementar un flujo real en NiFi para consumir al menos una API publica exigida por el enunciado.
-- [ ] Elegir la fuente externa final:
+- [x] Implementar un flujo real en NiFi para consumir al menos una API publica exigida por el enunciado.
+- [x] Elegir la fuente externa final:
   - OpenWeather.
   - otra API publica estable y documentable.
-- [ ] Modelar el flujo NiFi con processors equivalentes a:
+- [x] Modelar el flujo NiFi con processors equivalentes a:
   - `InvokeHTTP`.
   - transformacion/normalizacion JSON.
   - `RouteOnAttribute`.
   - `PublishKafka...` y/o `PutHDFS`.
-- [ ] Configurar back-pressure, reintentos y cola de errores en NiFi.
-- [ ] Guardar evidencia exportable del flujo NiFi para la memoria y la demo.
+- [x] Configurar back-pressure, reintentos y cola de errores en NiFi.
+- [x] Guardar evidencia exportable del flujo NiFi para la memoria y la demo.
 
 ### Kafka
 - [x] Existe topic `datos_crudos`.
 - [x] Existe topic `alertas_globales`.
-- [ ] Crear y usar un topic de `datos_filtrados` o equivalente, porque el enunciado pide separar datos crudos y filtrados.
+- [x] Crear y usar un topic de `datos_filtrados` o equivalente, porque el enunciado pide separar datos crudos y filtrados.
 - [ ] Definir claramente el contrato de eventos por topic:
   - posiciones GPS.
   - alertas globales.
   - eventos de stock o datos maestros si se incorporan.
 - [ ] Añadir scripts/comandos de verificacion de topics, particiones y retencion.
-- [ ] Probar flujo extremo a extremo NiFi -> Kafka -> consumidor.
+- [x] Probar flujo extremo a extremo NiFi -> Kafka -> consumidor.
 
 ### Raw landing y auditoria
 - [x] Ya existe landing raw en HDFS desde Kafka.
@@ -60,23 +60,23 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [ ] Añadir una validacion automatica minima del schema de staging y conteos por tabla.
 
 ### Enriquecimiento con datos maestros en Hive
-- [ ] Crear tablas maestras reales en Hive:
+- [x] Crear tablas maestras reales en Hive:
   - `dim_ports`.
   - `dim_routes`.
   - `dim_warehouse`.
   - `dim_skus` o equivalente.
-- [ ] Enriquecer el pipeline Spark cruzando raw/staging con esas dimensiones Hive, no solo con valores simulados embebidos.
+- [x] Enriquecer el pipeline Spark cruzando raw/staging con esas dimensiones Hive, no solo con valores simulados embebidos.
 - [ ] Documentar el origen de cada dimension y el criterio de join.
-- [ ] Validar que las tablas Hive quedan consultables desde Spark y desde la UI/CLI elegida.
+- [x] Validar que las tablas Hive quedan consultables desde Spark y desde la UI/CLI elegida.
 
 ### Grafos con GraphFrames
 - [x] Ya existe `jobs/spark/02_graph_metrics.py`.
-- [ ] Confirmar si el analisis final va a centrarse en camino mas corto, criticidad o comunidades; idealmente cubrir al menos dos metricas.
-- [ ] Mejorar el modelo del grafo para acercarlo al enunciado:
+- [x] Confirmar si el analisis final va a centrarse en camino mas corto, criticidad o comunidades; idealmente cubrir al menos dos metricas.
+- [x] Mejorar el modelo del grafo para acercarlo al enunciado:
   - nodos = almacenes y puertos.
   - aristas = rutas con peso por tiempo y/o riesgo.
-- [ ] Incorporar una salida mas defendible para nodos criticos o rutas congestionadas.
-- [ ] Generar tablas/resultados listos para captura en Hive o Zeppelin.
+- [x] Incorporar una salida mas defendible para nodos criticos o rutas congestionadas.
+- [x] Generar tablas/resultados listos para captura en Hive o Zeppelin.
 
 ## 4. Fase III - Mineria y accion
 ### Structured Streaming
@@ -128,7 +128,7 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [ ] Documentar en la memoria que la entrega final no usa YARN/VMs y justificar la ruta Docker/local elegida.
 
 ## 7. Calidad, pruebas y validacion final
-- [ ] Crear un bloque minimo de validaciones reproducibles:
+- [x] Crear un bloque minimo de validaciones reproducibles:
   - `docker-compose config`.
   - `python3 -m compileall ingesta jobs airflow`.
   - smoke test de productores y consumidor.
@@ -163,20 +163,20 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [ ] Capturar visualizaciones utiles para la memoria.
 
 ## 10. Cierre operativo del proyecto
-- [ ] Definir una ruta oficial de ejecucion desde cero.
+- [x] Definir una ruta oficial de ejecucion desde cero.
 - [ ] Probar esa ruta en limpio en la maquina final.
 - [x] Resolver incoherencias entre Docker, scripts standalone y cluster de 3 VMs dejando Docker/local como ruta oficial.
 - [ ] Confirmar que todos los comandos del README funcionan o actualizarlos.
 - [ ] Dejar una checklist de entrega final marcada con fecha.
 
 ## 11. Checklist de entrega final
-- [ ] Stack final levantado sin errores.
-- [ ] Ingesta real demostrable desde API/NI-Fi/Kafka.
-- [ ] Copia raw en HDFS demostrable.
-- [ ] Staging y curated en Hive demostrables.
-- [ ] Grafo y metricas defendibles demostrables.
-- [ ] Persistencia Cassandra demostrable para baja latencia.
+- [x] Stack final levantado sin errores.
+- [x] Ingesta real demostrable desde API/NI-Fi/Kafka.
+- [x] Copia raw en HDFS demostrable.
+- [x] Staging y curated en Hive demostrables.
+- [x] Grafo y metricas defendibles demostrables.
+- [x] Persistencia Cassandra demostrable para baja latencia.
 - [ ] DAG Airflow ejecutado con exito.
-- [ ] Al menos una alerta operativa generada y registrada.
+- [x] Al menos una alerta operativa generada y registrada.
 - [ ] Memoria completa con capturas.
 - [ ] Demo final ensayada.
