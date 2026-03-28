@@ -369,6 +369,14 @@ Sección a completar con diagrama:
 
 ### 9.1 Checklist exacto de evidencias operativas
 
+Estado actual de capturas ya realizadas en esta sesion:
+- NiFi: canvas + `InvokeHTTP` + `PublishKafka`
+- Kafka: consumo correcto de `datos_filtrados`
+- Hive: `stg_weather_open_meteo`, `dim_ports_routes_weather`, `fact_weather_operational`
+- Cassandra: `vehicle_latest_state`
+- HDFS curated: listado de `fact_weather_operational`, `fact_route_risk`, `fact_graph_centrality`
+- Pendientes visuales principales: GraphFrames por consulta dedicada y DAGs de Airflow con ejecucion
+
 **Kafka**
 
 ```bash
@@ -421,6 +429,11 @@ docker-compose exec -T spark spark-sql -e "SELECT * FROM logistica.fact_graph_ce
 docker-compose exec -T cassandra cqlsh -e "SELECT ship_id, route_id, dest_port, warehouse, stock_on_hand, reorder_point FROM logistica.vehicle_latest_state;"
 ```
 
+Evidencia ya validada en sesion:
+- `ship-001 | route-shanghai-algeciras | Algeciras | Valladolid | 11 | 30`
+- `ship-002 | route-shanghai-valencia | Valencia | Valladolid | 93 | 30`
+- `ship-003 | route-shanghai-barcelona | Barcelona | Valladolid | 95 | 30`
+
 **Spark job clave en Docker**
 
 ```bash
@@ -437,6 +450,9 @@ Capturar:
 - vista Graph
 - un run exitoso
 - si es posible, un reintento
+
+Pendiente actual:
+- repetir acceso a la UI y capturar lista de DAGs y Graph view en esta tanda final
 
 ### 9.2 Guion corto de demo final
 

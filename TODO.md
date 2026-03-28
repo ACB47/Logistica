@@ -146,13 +146,13 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [ ] Incluir justificacion tecnica de cada tecnologia usada.
 - [x] Preparar checklist exacto de evidencias y comandos para la memoria/demo.
 - [ ] Incluir capturas obligatorias:
-  - HDFS.
-  - Kafka topics.
-  - NiFi canvas.
-  - Hive tablas.
-  - GraphFrames resultados.
-  - Airflow DAG.
-  - Cassandra consultas.
+  - [x] Kafka topics.
+  - [x] NiFi canvas.
+  - [x] Hive tablas base (`stg_weather_open_meteo`, `dim_ports_routes_weather`, `fact_weather_operational`).
+  - [x] Cassandra consultas.
+  - [x] HDFS curated.
+  - [ ] GraphFrames resultados.
+  - [ ] Airflow DAG.
 - [ ] Explicar claramente que parte esta implementada de verdad y que parte es simulada.
 - [ ] Redactar conclusiones, limitaciones y mejoras futuras.
 
@@ -176,7 +176,7 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [x] Staging y curated en Hive demostrables.
 - [x] Grafo y metricas defendibles demostrables.
 - [x] Persistencia Cassandra demostrable para baja latencia.
-- [ ] DAG Airflow ejecutado con exito.
+- [ ] DAG Airflow ejecutado con exito y capturado.
 - [x] Al menos una alerta operativa generada y registrada.
 - [ ] Memoria completa con capturas.
 - [ ] Demo final ensayada.

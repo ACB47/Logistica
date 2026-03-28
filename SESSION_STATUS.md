@@ -149,9 +149,17 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
   - notebooks Zeppelin existentes en `zeppelin/`
   - checklist exacto de evidencias y comandos ya documentado en `docs/00_documento_word.md`
   - ya hay evidencias manuales empezadas de NiFi, Kafka y Hive weather staging
+  - capturas ya realizadas en esta tanda:
+    - NiFi canvas + `InvokeHTTP` + `PublishKafka`
+    - Kafka `datos_filtrados`
+    - Hive `stg_weather_open_meteo`
+    - Hive `dim_ports_routes_weather`
+    - Hive `fact_weather_operational`
+    - Cassandra `vehicle_latest_state`
+    - HDFS curated
 - Falta para cerrar:
   - memoria final completa
-  - capturas obligatorias
+  - capturas pendientes de GraphFrames y Airflow
   - narrativa clara de arquitectura final y limitaciones
   - guion de demo final
 
@@ -197,8 +205,8 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 
 ## Siguiente bloque recomendado
 1. Capturar para la memoria toda la cadena validada: NiFi -> `datos_filtrados` -> `stg_weather_open_meteo` -> `dim_ports_routes_weather` -> `fact_weather_operational` y el pipeline legacy `stg_ships` -> `fact_route_risk` -> `fact_alerts`, incluyendo dimensiones maestras Hive.
-2. Afinar Airflow para cubrir reentrenamiento mensual y alertas de fallo de forma mas defendible.
-3. Completar capturas finales y memoria tecnica usando la checklist ya documentada.
+2. Completar las capturas pendientes de GraphFrames y Airflow.
+3. Afinar Airflow para cubrir reentrenamiento mensual y alertas de fallo de forma mas defendible.
 4. Dejar una ruta oficial de demo desde Docker completamente ensayada.
 5. Revisar SMTP y la demostracion visual de alertas/Airflow antes del cierre.
 
