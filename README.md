@@ -92,6 +92,85 @@ El proyecto está **completamente dockerizado** para ejecutarse en cualquier ord
 | GraphFrames | Análisis de rutas marítimas |
 | Airflow | Orquestación del pipeline KDD |
 
+## Funcionalidades del sistema
+
+| Módulo | Descripción |
+|---|---|
+| Ingesta (KDD) | NiFi consume Open-Meteo, publica en Kafka `datos_crudos` y `datos_filtrados`, y deja evidencia exportable del flujo. |
+| Procesamiento Spark | Spark genera staging en Hive, dimensiones maestras, enriquecimiento climático, facts operativas, alertas y análisis de grafos. |
+| Persistencia | Hive/HDFS para histórico, staging y curated. Cassandra para `vehicle_latest_state` de baja latencia. |
+| Dashboard | Dashboard Streamlit con estado de servicios, mapa, alertas, tablas clave y diagramas KDD/UML. |
+| Orquestación | Airflow con DAG principal `logistica_kdd_microbatch` y DAG mensual `logistica_kdd_monthly_retrain`. |
+| Evidencias | Capturas, consultas, export NiFi, parquet en HDFS y tablas Hive/Cassandra para la defensa. |
+
+## Responsabilidades de cada componente
+
+| Componente | Responsabilidad única | Entrada | Salida |
+|---|---|---|---|
+| NiFi | Consumir API pública y publicar raw/filtered | Open-Meteo | Kafka `datos_crudos`, `datos_filtrados` |
+| Kafka | Cola de mensajes | NiFi | Lectura por Spark |
+| HDFS | Persistencia raw/staging/curated | NiFi / Spark | JSONL y parquet |
+| Spark | Limpiar, enriquecer, calcular facts y grafos | Kafka + HDFS + Hive | Hive + HDFS + Cassandra |
+| Hive | Capa SQL analítica | Spark | Tablas `stg_*`, `dim_*`, `fact_*` |
+| Cassandra | Estado actual de baja latencia | Spark/loader | `vehicle_latest_state` |
+| Airflow | Orquestación | Scripts y jobs | Ejecución programada |
+| Dashboard | Exposición y consulta visual | Hive + Cassandra + estado Docker | UI web |
+
+## Flujo de datos
+
+```text
+Open-Meteo -> NiFi -> Kafka (datos_crudos / datos_filtrados)
+                         |
+                         v
+                      Spark
+                         |
+        -----------------------------------------
+        |                    |                  |
+        v                    v                  v
+     Hive/HDFS         GraphFrames         Cassandra
+(staging/dim/fact)   (risk/centrality)  (vehicle_latest_state)
+                         |
+                         v
+                      Airflow
+                         |
+                         v
+                     Dashboard
+```
+
+## Persistencia y tablas principales
+
+| Tabla | Tipo | Uso |
+|---|---|---|
+| `logistica.stg_weather_open_meteo` | Hive staging | clima filtrado desde Kafka |
+| `logistica.stg_ships` | Hive staging | posiciones de barcos y stock simulado |
+| `logistica.dim_ports` | Hive dimensión | puertos |
+| `logistica.dim_routes` | Hive dimensión | rutas |
+| `logistica.dim_warehouse` | Hive dimensión | almacenes |
+| `logistica.dim_ports_routes_weather` | Hive enriquecida | clima + ruta + puerto |
+| `logistica.fact_weather_operational` | Hive fact | acción operativa final |
+| `logistica.fact_route_risk` | Hive fact | riesgo por ruta |
+| `logistica.fact_graph_centrality` | Hive fact | criticidad de nodos |
+| `logistica.fact_alerts` | Hive fact | alertas operativas |
+| `logistica.vehicle_latest_state` | Cassandra | último estado por vehículo |
+
+## Dashboard
+
+- Stack elegido: `Streamlit`
+- Objetivo: facilitar la exposición del flujo KDD con una sola interfaz.
+- El dashboard incluye:
+  - estado de servicios `OK / NOK / OFF`
+  - botones para arrancar y parar servicios
+  - mapa con puertos, rutas y barcos
+  - alertas operativas por ruta/puerto
+  - tablas de `fact_alerts`, `fact_weather_operational`, `fact_graph_centrality` y `vehicle_latest_state`
+  - diagramas de flujo, secuencia, clases y casos de uso
+
+- Ejecución:
+
+```bash
+bash scripts/67_run_dashboard.sh
+```
+
 ## Estructura del proyecto
 
 ```

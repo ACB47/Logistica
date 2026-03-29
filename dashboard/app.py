@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 from pathlib import Path
@@ -116,6 +117,208 @@ flowchart TB
     U1 --> UC6[Arrancar / parar stack]
 """
 
+CUSTOM_CSS = """
+<style>
+    .stApp {
+        background: radial-gradient(circle at top left, #17345c 0%, #0b1220 45%, #070b13 100%);
+        color: #e5eefb;
+    }
+    .stApp, .stApp * {
+        color: #e5eefb;
+    }
+    [data-testid="stAppViewContainer"],
+    [data-testid="stHeader"],
+    [data-testid="stToolbar"],
+    [data-testid="stSidebar"],
+    [data-testid="stSidebar"] *,
+    [data-testid="stMainBlockContainer"],
+    [data-testid="stMainBlockContainer"] *,
+    section[data-testid="stSidebar"] *,
+    div[data-testid="stVerticalBlock"] *,
+    div[data-testid="stHorizontalBlock"] * {
+        color: #e5eefb !important;
+    }
+    .block-container {
+        padding-top: 1.2rem;
+        padding-bottom: 2rem;
+        max-width: 1500px;
+    }
+    h1, h2, h3, h4, h5, h6, p, li, span, label {
+        color: #e5eefb !important;
+        font-family: "Inter", sans-serif;
+    }
+    div[data-testid="stMetric"] {
+        background: linear-gradient(180deg, rgba(16,27,52,0.95), rgba(10,18,34,0.94));
+        border: 1px solid rgba(125, 211, 252, 0.12);
+        padding: 1rem;
+        border-radius: 1rem;
+        box-shadow: 0 12px 32px rgba(0,0,0,0.22);
+    }
+    div[data-testid="stDataFrame"], div[data-testid="stTable"] {
+        background: rgba(8, 15, 29, 0.72);
+        border: 1px solid rgba(125, 211, 252, 0.1);
+        border-radius: 1rem;
+        padding: 0.5rem;
+    }
+    div[data-baseweb="tab-list"] button {
+        color: #d9e7ff !important;
+        background: rgba(255,255,255,0.04) !important;
+        border-radius: 12px 12px 0 0 !important;
+    }
+    div[data-baseweb="tab-list"] button[aria-selected="true"] {
+        color: #ffffff !important;
+        background: rgba(98, 210, 198, 0.12) !important;
+    }
+    .stButton button {
+        color: #edf5ff !important;
+        border: 1px solid rgba(125, 211, 252, 0.18) !important;
+        background: linear-gradient(180deg, rgba(17,34,62,0.92), rgba(9,18,35,0.92)) !important;
+    }
+    .stButton button:hover {
+        border-color: rgba(98, 210, 198, 0.45) !important;
+        color: #ffffff !important;
+    }
+    [data-testid="stMetricLabel"],
+    [data-testid="stMetricValue"],
+    [data-testid="stMetricDelta"],
+    [data-testid="stMarkdownContainer"],
+    [data-testid="stCaptionContainer"],
+    [data-testid="stText"],
+    [data-testid="stSubheader"],
+    [data-testid="stHeaderActionElements"],
+    [data-testid="stExpander"],
+    [data-testid="stExpander"] *,
+    [data-testid="stTabs"] *,
+    [data-testid="stSidebarNav"] *,
+    [data-testid="stNotificationContent"] *,
+    [data-testid="stException"] *,
+    [data-testid="stAlertContainer"] *,
+    [data-testid="stCodeBlock"] *,
+    [data-testid="stCheckbox"] *,
+    [data-testid="stRadio"] *,
+    [data-testid="stSelectbox"] *,
+    [data-testid="stMultiSelect"] *,
+    [data-testid="stTextInput"] *,
+    [data-testid="stNumberInput"] *,
+    [data-testid="stFileUploader"] *,
+    .stAlert,
+    .stCode,
+    .stText,
+    .element-container,
+    .element-container *,
+    .st-emotion-cache-1kyxreq,
+    .st-emotion-cache-1kyxreq *,
+    .st-emotion-cache-z5fcl4,
+    .st-emotion-cache-z5fcl4 *,
+    .st-emotion-cache-10trblm,
+    .st-emotion-cache-1wivap2,
+    .st-emotion-cache-16txtl3,
+    .st-emotion-cache-ue6h4q {
+        color: #e5eefb !important;
+    }
+    .stDataFrame table, .stTable table {
+        color: #e5eefb !important;
+        background: transparent !important;
+    }
+    .stDataFrame thead tr th, .stTable thead tr th {
+        color: #9fd8ff !important;
+        background: rgba(255,255,255,0.03) !important;
+    }
+    .stDataFrame tbody tr td, .stTable tbody tr td {
+        color: #e5eefb !important;
+    }
+    .stDataFrame [role="gridcell"],
+    .stDataFrame [role="columnheader"],
+    .stDataFrame [role="rowheader"],
+    .stDataEditor [role="gridcell"],
+    .stDataEditor [role="columnheader"],
+    .stDataEditor [role="rowheader"] {
+        color: #e5eefb !important;
+    }
+    svg text,
+    svg tspan,
+    .mermaid text,
+    .mermaid tspan,
+    .mermaid span,
+    .mermaid foreignObject,
+    .mermaid foreignObject * {
+        fill: #e5eefb !important;
+        color: #e5eefb !important;
+    }
+    .mermaid .nodeLabel,
+    .mermaid .edgeLabel,
+    .mermaid .label,
+    .mermaid .cluster-label text {
+        color: #e5eefb !important;
+        fill: #e5eefb !important;
+    }
+    a, a:visited, a:hover {
+        color: #86d7ff !important;
+    }
+    code, pre {
+        color: #f1f5f9 !important;
+    }
+    .glass-card {
+        background: linear-gradient(180deg, rgba(13,23,43,0.96), rgba(8,14,28,0.92));
+        border: 1px solid rgba(125, 211, 252, 0.14);
+        border-radius: 22px;
+        padding: 20px 22px;
+        box-shadow: 0 18px 48px rgba(0,0,0,0.25);
+    }
+    .hero-eyebrow {
+        color: #62d2c6 !important;
+        font-size: 0.8rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        margin-bottom: 0.2rem;
+    }
+    .hero-title {
+        font-size: 4rem;
+        line-height: 0.95;
+        font-weight: 800;
+        margin: 0;
+    }
+    .hero-subtitle {
+        color: #a6b7d5 !important;
+        font-size: 1rem;
+        max-width: 760px;
+        margin-top: 0.8rem;
+    }
+    .tag-chip {
+        display: inline-block;
+        padding: 8px 14px;
+        margin: 6px 8px 0 0;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.1);
+        background: rgba(255,255,255,0.03);
+        color: #d7e6ff !important;
+        font-size: 0.86rem;
+    }
+    .tiny-label {
+        color: #8aa4c9 !important;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+    }
+    .big-number {
+        font-size: 3rem;
+        font-weight: 800;
+        margin-top: 0.3rem;
+    }
+    .status-pill {
+        display: inline-block;
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: 0.8rem;
+        font-weight: 700;
+    }
+    .pill-ok { background: rgba(34,197,94,0.16); color: #86efac !important; }
+    .pill-warn { background: rgba(245,158,11,0.16); color: #fcd34d !important; }
+    .pill-danger { background: rgba(239,68,68,0.16); color: #fca5a5 !important; }
+    .pill-off { background: rgba(148,163,184,0.14); color: #cbd5e1 !important; }
+</style>
+"""
+
 
 def run_command(command: list[str], timeout: int = 120, check: bool = False) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
@@ -129,18 +332,57 @@ def run_command(command: list[str], timeout: int = 120, check: bool = False) -> 
 
 
 def render_mermaid(title: str, code: str) -> None:
+    diagram_id = f"mermaid-{hashlib.md5(title.encode('utf-8')).hexdigest()[:10]}"
+    code_json = json.dumps(code)
     components.html(
         f"""
-        <div style=\"background:#0f172a;padding:16px;border-radius:18px;border:1px solid #1e293b;\">
-          <h3 style=\"color:white;font-family:Inter,sans-serif;\">{title}</h3>
-          <pre class=\"mermaid\">{code}</pre>
+        <div style=\"background:linear-gradient(180deg, rgba(12,20,38,0.97), rgba(8,14,28,0.96));padding:18px;border-radius:20px;border:1px solid rgba(125,211,252,0.14);box-shadow:0 18px 48px rgba(0,0,0,0.25);\">
+          <div style=\"color:#8ecfe0;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;margin-bottom:6px;font-family:Inter,sans-serif;\">Diagrama</div>
+          <h3 style=\"color:white;font-family:Inter,sans-serif;margin:0 0 12px 0;\">{title}</h3>
+          <div id=\"{diagram_id}\" style=\"overflow:auto;background:rgba(255,255,255,0.02);border-radius:16px;padding:10px;\"></div>
         </div>
         <script type=\"module\">
           import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-          mermaid.initialize({{ startOnLoad: true, theme: 'dark' }});
+          const definition = {code_json};
+          mermaid.initialize({{
+            startOnLoad: false,
+            theme: 'dark',
+            securityLevel: 'loose',
+            themeVariables: {{
+              background: '#0b1220',
+              primaryColor: '#133657',
+              primaryTextColor: '#e5eefb',
+              primaryBorderColor: '#62d2c6',
+              lineColor: '#7dd3fc',
+              secondaryColor: '#111c31',
+              tertiaryColor: '#0f172a',
+              fontFamily: 'Inter, sans-serif'
+            }}
+          }});
+          const el = document.getElementById('{diagram_id}');
+          mermaid.render('{diagram_id}-svg', definition).then((result) => {{
+            el.innerHTML = result.svg;
+          }}).catch((error) => {{
+            el.innerHTML = `<div style="color:#fca5a5;font-family:Inter,sans-serif;padding:12px;">No se pudo renderizar el diagrama.<br/>${{String(error)}}</div>`;
+          }});
         </script>
         """,
-        height=420,
+        height=460,
+    )
+
+
+def render_html_card(html: str, height: int = 180) -> None:
+    components.html(f"<div class='glass-card'>{html}</div>", height=height)
+
+
+def render_metric_card(title: str, value: str, subtitle: str) -> None:
+    render_html_card(
+        f"""
+        <div class='tiny-label'>{title}</div>
+        <div class='big-number'>{value}</div>
+        <div style='color:#8aa4c9;margin-top:0.3rem'>{subtitle}</div>
+        """,
+        height=170,
     )
 
 
@@ -189,13 +431,18 @@ def get_dashboard_bundle() -> dict:
         "exec",
         "-T",
         "spark",
-        "python",
+        "spark-submit",
         "/home/jovyan/jobs/spark/99_dashboard_bundle.py",
     ]
     result = run_command(command, timeout=600)
     if result.returncode != 0:
         raise RuntimeError(result.stderr or "No se pudo consultar el bundle del dashboard")
-    return json.loads(result.stdout.strip() or "{}")
+
+    lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    json_line = next((line for line in reversed(lines) if line.startswith("{") and line.endswith("}")), None)
+    if not json_line:
+        raise RuntimeError("No se encontro salida JSON valida del bundle del dashboard")
+    return json.loads(json_line)
 
 
 def build_map_data(bundle: dict) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -233,10 +480,27 @@ def build_map_data(bundle: dict) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFra
     return ports, routes, ships
 
 
-st.set_page_config(page_title="Dashboard KDD Logistica", layout="wide")
+def summarize_risk(bundle: dict) -> tuple[int, int, float]:
+    alerts = pd.DataFrame(bundle.get("fact_alerts", []))
+    weather = pd.DataFrame(bundle.get("fact_weather_operational", []))
+    critical = int((alerts["severity"] >= 4).sum()) if not alerts.empty else 0
+    medium = int((alerts["severity"] >= 2).sum()) if not alerts.empty else 0
+    avg_delay = float(weather["weather_delay_hours_estimate"].mean()) if not weather.empty else 0.0
+    return critical, medium, avg_delay
 
-st.title("Dashboard KDD Logistica Maritima")
-st.caption("Panel de defensa: arquitectura, diagramas, estado de servicios, mapa GPS y alertas operativas")
+
+def build_service_badge(badge: str) -> str:
+    if badge == "OK":
+        return "pill-ok"
+    if badge == "NOK":
+        return "pill-danger"
+    if badge == "BOOT":
+        return "pill-warn"
+    return "pill-off"
+
+
+st.set_page_config(page_title="Dashboard KDD Logistica", layout="wide")
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 with st.sidebar:
     st.subheader("Controles")
@@ -260,12 +524,59 @@ service_rows = get_service_status()
 ok_count = sum(1 for row in service_rows if row["badge"] == "OK")
 nok_count = sum(1 for row in service_rows if row["badge"] == "NOK")
 off_count = sum(1 for row in service_rows if row["badge"] == "OFF")
+critical_alerts, medium_alerts, avg_delay = summarize_risk(bundle)
 
-metric_cols = st.columns(4)
-metric_cols[0].metric("Servicios OK", ok_count)
-metric_cols[1].metric("Servicios NOK", nok_count)
-metric_cols[2].metric("Servicios OFF", off_count)
-metric_cols[3].metric("Alertas operativas", len(bundle.get("fact_alerts", [])))
+hero_left, hero_right = st.columns([1.7, 0.9])
+with hero_left:
+    st.markdown("<div class='hero-eyebrow'>BIG DATA TRANSPORT MONITOR</div>", unsafe_allow_html=True)
+    st.markdown("<div class='hero-title'>Transport Pulse<br/>Dashboard</div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='hero-subtitle'>Centro de control del pipeline KDD: posicion de flota, riesgo meteorologico, alertas operativas, estado de servicios y analitica de red para la logistica maritima.</div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        """
+        <div>
+          <span class='tag-chip'>NiFi</span>
+          <span class='tag-chip'>Kafka</span>
+          <span class='tag-chip'>Spark + Hive</span>
+          <span class='tag-chip'>Cassandra</span>
+          <span class='tag-chip'>GraphFrames</span>
+          <span class='tag-chip'>Airflow</span>
+          <span class='tag-chip'>Open-Meteo</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+with hero_right:
+    render_html_card(
+        f"""
+        <div class='tiny-label'>sincronizado</div>
+        <h3 style='margin:6px 0 10px 0'>Estado del pipeline</h3>
+        <p style='color:#9db2d5'>Snapshots servidos desde Spark/Hive, HDFS y Cassandra con control en vivo de servicios Docker.</p>
+        <div style='display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px'>
+          <div><div class='tiny-label'>Pipeline</div><strong>En seguimiento</strong></div>
+          <div><div class='tiny-label'>Riesgo medio</div><strong>{'MEDIUM' if medium_alerts else 'LOW'}</strong></div>
+          <div><div class='tiny-label'>Servicios OK</div><strong>{ok_count}/{len(service_rows)}</strong></div>
+          <div><div class='tiny-label'>Storage</div><strong>HDFS + Hive</strong></div>
+        </div>
+        """,
+        height=260,
+    )
+
+metric_cols = st.columns(6)
+with metric_cols[0]:
+    render_metric_card("Flota monitorizada", str(len(bundle.get("ships_latest", []))), "Ultimo estado por vehiculo")
+with metric_cols[1]:
+    render_metric_card("Rutas bajo observacion", str(len(bundle.get("fact_alerts", []))), "Alertas operativas disponibles")
+with metric_cols[2]:
+    render_metric_card("Riesgo meteo alto/medio", str(medium_alerts), "Fact weather operational")
+with metric_cols[3]:
+    render_metric_card("Retraso medio actual", f"{avg_delay:.1f}h", "Sobre rutas con contexto")
+with metric_cols[4]:
+    render_metric_card("Servicios NOK", str(nok_count), "Contenedores con incidencia")
+with metric_cols[5]:
+    render_metric_card("Vehiculos impactados", str(critical_alerts), "Alertas severidad >= 4")
 
 tab_overview, tab_diagrams, tab_map, tab_ops = st.tabs([
     "Resumen KDD",
@@ -292,13 +603,44 @@ with tab_overview:
         for error in bundle["errors"]:
             st.write(f"- {error}")
 
-    c1, c2 = st.columns(2)
+    overview_left, overview_right = st.columns([1.55, 1])
+    with overview_left:
+        render_html_card(
+            """
+            <div class='tiny-label'>ruta de defensa</div>
+            <h3 style='margin:0.3rem 0 0.7rem 0'>Micro-batch documentado</h3>
+            <p style='color:#9db2d5'>La demo se centra en Docker/local con NiFi, Kafka, HDFS/Hive, Spark, GraphFrames, Cassandra y Airflow, manteniendo streaming real como evidencia tecnica complementaria.</p>
+            <ul>
+              <li>staging y curated persistidos en Hive/HDFS</li>
+              <li>alertas operativas y riesgo de red demostrables</li>
+              <li>estado de vehiculos en Cassandra para baja latencia</li>
+            </ul>
+            """,
+            height=230,
+        )
+    with overview_right:
+        latest_weather = pd.DataFrame(bundle.get("fact_weather_operational", []))
+        if not latest_weather.empty:
+            top = latest_weather.iloc[0]
+            render_html_card(
+                f"""
+                <div class='tiny-label'>resumen ejecutivo</div>
+                <h3 style='margin:0.3rem 0 0.6rem 0'>{top['port_ref']} / {top['route_id']}</h3>
+                <p><strong>Estado:</strong> {top['port_operational_status']}</p>
+                <p><strong>Riesgo:</strong> {top['weather_risk_level']}</p>
+                <p><strong>Retraso estimado:</strong> {top['weather_delay_hours_estimate']} horas</p>
+                <p><strong>Accion:</strong> {top['recommended_action']}</p>
+                """,
+                height=230,
+            )
+
+    c1, c2 = st.columns([1.1, 0.9])
     with c1:
         st.subheader("Alertas operativas")
         st.dataframe(pd.DataFrame(bundle.get("fact_alerts", [])), use_container_width=True, hide_index=True)
     with c2:
-        st.subheader("Fact weather operational")
-        st.dataframe(pd.DataFrame(bundle.get("fact_weather_operational", [])), use_container_width=True, hide_index=True)
+        st.subheader("Estado operativo por vehiculo")
+        st.dataframe(pd.DataFrame(bundle.get("ships_latest", [])), use_container_width=True, hide_index=True)
 
 with tab_diagrams:
     render_mermaid("Flujo KDD", KDD_MERMAID)
@@ -307,7 +649,7 @@ with tab_diagrams:
     render_mermaid("Casos de Uso", USE_CASE_MERMAID)
 
 with tab_map:
-    st.subheader("Mapa de barcos y rutas con alertas")
+    st.subheader("Seguimiento de flota y alertas de ruta")
     ports_df, routes_df, ships_df = build_map_data(bundle)
     layers = []
     if not routes_df.empty:
@@ -356,11 +698,19 @@ with tab_map:
             use_container_width=True,
         )
 
-    col_left, col_right = st.columns(2)
+    col_left, col_right = st.columns([1.15, 0.85])
     with col_left:
         st.subheader("Ultimo estado de barcos")
         st.dataframe(ships_df, use_container_width=True, hide_index=True)
     with col_right:
+        st.subheader("Clima y operacion")
+        st.dataframe(pd.DataFrame(bundle.get("fact_weather_operational", [])), use_container_width=True, hide_index=True)
+
+    network_left, network_right = st.columns([1.2, 0.8])
+    with network_left:
+        st.subheader("Red logistica activa")
+        st.dataframe(pd.DataFrame(bundle.get("graph_centrality", [])), use_container_width=True, hide_index=True)
+    with network_right:
         st.subheader("Alertas por puerto")
         st.dataframe(pd.DataFrame(bundle.get("fact_alerts", [])), use_container_width=True, hide_index=True)
 
@@ -370,8 +720,10 @@ with tab_ops:
         cols = st.columns([2, 3, 2, 1, 1])
         cols[0].write(f"**{row['service']}**")
         cols[1].write(row["status"])
-        badge_color = {"OK": "🟢", "NOK": "🔴", "BOOT": "🟠", "OFF": "⚫"}.get(row["badge"], "⚪")
-        cols[2].write(f"{badge_color} {row['badge']}")
+        cols[2].markdown(
+            f"<span class='status-pill {build_service_badge(row['badge'])}'>{row['badge']}</span>",
+            unsafe_allow_html=True,
+        )
         if cols[3].button("On", key=f"start_{row['service']}"):
             st.code(compose_service_action(row["service"] if row["service"] != "airflow" else "airflow-webserver", "start"))
             st.rerun()
@@ -379,5 +731,10 @@ with tab_ops:
             st.code(compose_service_action(row["service"] if row["service"] != "airflow" else "airflow-webserver", "stop"))
             st.rerun()
 
-    st.subheader("GraphFrames")
-    st.dataframe(pd.DataFrame(bundle.get("graph_centrality", [])), use_container_width=True, hide_index=True)
+    ops_left, ops_right = st.columns([1, 1])
+    with ops_left:
+        st.subheader("GraphFrames")
+        st.dataframe(pd.DataFrame(bundle.get("graph_centrality", [])), use_container_width=True, hide_index=True)
+    with ops_right:
+        st.subheader("Fact weather operational")
+        st.dataframe(pd.DataFrame(bundle.get("fact_weather_operational", [])), use_container_width=True, hide_index=True)
