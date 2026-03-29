@@ -361,6 +361,23 @@ Sección a completar con diagrama:
 
 ## 9. Evidencias y capturas (checklist)
 
+### 9.0 Dashboard de exposicion
+
+Se ha anadido un dashboard ligero en `Streamlit` para facilitar la defensa del flujo KDD y reducir la dependencia de cambiar entre multiples interfaces durante la exposicion.
+
+Incluye:
+- resumen KDD y estado de cumplimiento de la rubrica
+- estado en vivo de servicios Docker con botones `On/Off`
+- mapa de barcos con alertas de ruta
+- tablas curadas relevantes para la defensa
+- diagramas Mermaid: flujo, secuencia, clases y casos de uso
+
+Ejecucion:
+
+```bash
+bash scripts/67_run_dashboard.sh
+```
+
 - HDFS: UIs + `hdfs dfs -ls`.
 - Kafka KRaft: topics creados + describe.
 - Hive: tablas raw/staging/curated.

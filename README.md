@@ -64,6 +64,19 @@ El proyecto está **completamente dockerizado** para ejecutarse en cualquier ord
 - Si Spark/Hive pierde tablas tras reinicio, recrear el contenedor `spark` para reabrir el metastore persistente:
   - `docker-compose rm -sf spark && docker-compose up -d spark`
 
+## Dashboard de defensa
+
+- Stack elegido: `Streamlit`
+- Motivo: menor complejidad para dashboard, mapas, estados de servicio y paneles KDD.
+- Ejecucion:
+  - `bash scripts/67_run_dashboard.sh`
+- Incluye:
+  - estado de servicios `OK/NOK/OFF`
+  - botones de arranque/parada por servicio
+  - mapa de barcos y rutas con alertas
+  - pestañas con diagrama KDD, secuencia, clases y casos de uso
+  - tablas de `fact_alerts`, `fact_weather_operational` y `fact_graph_centrality`
+
 ## Stack tecnológico (rúbrica cumplida)
 
 | Componente | Implementación |

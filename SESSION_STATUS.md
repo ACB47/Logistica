@@ -35,6 +35,7 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - El error concreto de Derby (`metastore_db already exists`) queda corregido moviendo la persistencia a `derby.system.home=/home/jovyan/.derby` en el servicio `spark`.
 - `datos_filtrados_ok` ya queda incluido en la inicializacion automatica de Kafka para evitar fallos del rebuild tras reinicios.
 - El rebuild completo ya queda validado de nuevo: `fact_alerts` y el resto de tablas principales reaparecen correctamente tras `scripts/66_rebuild_hive_demo_tables.sh`.
+- Ya existe una base de dashboard en `Streamlit` con mapa, diagramas, estado de servicios y tablas clave para la defensa.
 - Lo mas importante pendiente ahora es cerrar evidencias, Airflow visual, narrativa final de defensa y documentacion completa sobre la ruta Docker/local.
 
 ## Estado por fases KDD
@@ -196,6 +197,9 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - `scripts/63_run_weather_filtered_staging.sh`
 - `scripts/65_load_vehicle_latest_state_cassandra.sh`
 - `docs/00_documento_word.md`
+- `dashboard/app.py`
+- `jobs/spark/99_dashboard_bundle.py`
+- `scripts/67_run_dashboard.sh`
 - `docs/01_nifi_open_meteo_flow.md`
 - `airflow/dags/logistica_kdd_dag.py`
 - `jobs/spark/01_raw_to_staging.py`
