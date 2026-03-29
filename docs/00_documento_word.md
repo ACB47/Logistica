@@ -463,6 +463,117 @@ Capturar:
 6. Mostrar Cassandra con `vehicle_latest_state`.
 7. Mostrar Airflow orquestando el flujo.
 
+### 9.3 Guion formal de defensa
+
+**Introducción**
+
+Este proyecto implementa una plataforma de datos orientada a logística marítima y portuaria. El objetivo principal es integrar datos operativos en tiempo casi real, combinarlos con información histórica y enriquecerlos con análisis de rutas para anticipar riesgos, priorizar acciones y mejorar la toma de decisiones.
+
+La propuesta sigue el ciclo KDD y cubre sus etapas principales: selección, preprocesamiento, transformación, minería e interpretación. La entrega final se defiende sobre una arquitectura Docker/local completamente funcional, con una estrategia de micro-batch documentado para reducir riesgo operativo durante la demo.
+
+**Arquitectura general**
+
+La arquitectura está compuesta por los siguientes bloques:
+
+- `Apache NiFi` para la ingesta desde una API pública real.
+- `Apache Kafka` como capa de mensajería, separando `datos_crudos` y `datos_filtrados`.
+- `HDFS` como almacenamiento distribuido para persistencia raw, staging y curated.
+- `Apache Hive` como capa SQL analítica sobre HDFS.
+- `Apache Spark` para limpieza, enriquecimiento, reglas de negocio, facts y grafos.
+- `GraphFrames` para el análisis de criticidad y estructura de la red logística.
+- `Apache Cassandra` para consultas de baja latencia sobre el último estado de vehículos.
+- `Apache Airflow` para la orquestación operativa y el refresco periódico.
+
+**Fase de ingesta y selección**
+
+La fase de ingesta se implementa con NiFi consumiendo una API pública meteorológica. Ese flujo publica dos salidas en Kafka:
+
+- `datos_crudos`, que conserva la respuesta original para trazabilidad.
+- `datos_filtrados`, que contiene un JSON simplificado y normalizado para analítica.
+
+Con esto se cubre la separación entre dato bruto y dato preparado, además de dejar evidencia reproducible mediante el export del flujo en `docs/nifi/OpenMeteo_Kafka_Flow.json`.
+
+**Fase de preprocesamiento y transformación**
+
+En Spark se construye una tabla de staging llamada `logistica.stg_weather_open_meteo`, que tipa, valida y normaliza el dato meteorológico recibido desde Kafka. Posteriormente se cargan dimensiones maestras reales en Hive:
+
+- `dim_ports`
+- `dim_routes`
+- `dim_warehouse`
+- `dim_skus`
+
+Estas dimensiones permiten reemplazar referencias embebidas y hacer joins más defendibles desde el punto de vista analítico.
+
+Después se genera `logistica.dim_ports_routes_weather`, que cruza el dato meteorológico con el contexto de puerto, ruta y almacén, calculando:
+
+- nivel de riesgo meteorológico
+- estado operativo del puerto
+- retraso estimado en horas
+
+**Fase de minería e interpretación**
+
+Sobre la capa enriquecida se construye `logistica.fact_weather_operational`, que representa la tabla operativa final del caso de clima. Esta tabla incluye:
+
+- riesgo operacional
+- retraso estimado
+- recomendación de acción
+- severidad operativa
+
+En paralelo, se mantiene el pipeline legacy basado en datos raw de barcos y alertas, que produce:
+
+- `logistica.fact_route_risk`
+- `logistica.fact_alerts`
+
+Esto permite demostrar una narrativa completa de alertas y priorización logística.
+
+**Análisis de grafos**
+
+La red logística se modela con GraphFrames, utilizando puertos y almacenes como nodos y rutas como aristas. Se han implementado dos métricas defendibles:
+
+- distancia o saltos entre nodos, persistida en `logistica.fact_graph_hops`
+- criticidad por grado, persistida en `logistica.fact_graph_centrality`
+
+Esto permite identificar nodos clave de la red, como Shanghai, Valladolid o Algeciras, y justificar decisiones operativas asociadas al cuello de botella o a la relevancia estructural del nodo.
+
+**Persistencia multicapa**
+
+La persistencia se divide según el caso de uso:
+
+- `Hive` se utiliza para staging, dimensiones y facts analíticas históricas.
+- `Cassandra` se utiliza para consultas rápidas sobre el último estado conocido de cada vehículo.
+
+La tabla `logistica.vehicle_latest_state` en Cassandra permite consultar directamente el último destino, almacén, stock y punto de reorden de cada barco, cubriendo el requisito de baja latencia.
+
+**Orquestación**
+
+La orquestación se resuelve con dos DAGs en Airflow:
+
+- `logistica_kdd_microbatch`, centrado en la ejecución operativa principal.
+- `logistica_kdd_monthly_retrain`, centrado en refresco de dimensiones, reconstrucción de grafos y limpieza de temporales.
+
+Además, se ha añadido visibilidad de fallos mediante `email_on_failure`, reforzando la parte operativa de la solución.
+
+**Decisiones de defensa y alcance**
+
+La decisión final para la defensa ha sido utilizar Docker/local como ruta oficial. Aunque existe trabajo de alineación conceptual con despliegues más distribuidos, la demo se apoya en un flujo estable y reproducible en local. Del mismo modo, Structured Streaming queda alineado a ventanas de `15 minutes`, pero la exposición principal se basa en micro-batch documentado para minimizar riesgo durante la presentación.
+
+**Limitaciones actuales**
+
+Las limitaciones principales del proyecto son:
+
+- la defensa no se realiza sobre VMs ni sobre YARN real en producción
+- el streaming real no es la ruta principal de demostración
+- algunas fuentes de negocio se han simplificado para hacer la demo más controlable
+- el bloque ML queda como evidencia técnica complementaria, no como núcleo de la defensa
+
+**Conclusión**
+
+En conjunto, el proyecto ya demuestra una cadena completa y funcional:
+
+NiFi -> Kafka -> HDFS/Hive -> Spark -> GraphFrames -> Cassandra -> Airflow
+
+La solución no solo ingiere y transforma datos, sino que también genera hechos analíticos, recomendaciones operativas, análisis de criticidad de red y consultas de baja latencia. Esto permite defender el proyecto como una plataforma coherente de ingeniería de datos aplicada al dominio logístico.
+
 ---
 
 ## 10. Conclusiones

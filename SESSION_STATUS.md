@@ -150,6 +150,7 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
   - guia base: `docs/00_documento_word.md`
   - notebooks Zeppelin existentes en `zeppelin/`
   - checklist exacto de evidencias y comandos ya documentado en `docs/00_documento_word.md`
+  - ya existe un guion formal de defensa documentado en `docs/00_documento_word.md`
   - ya hay evidencias manuales empezadas de NiFi, Kafka y Hive weather staging
   - capturas ya realizadas en esta tanda:
     - NiFi canvas + `InvokeHTTP` + `PublishKafka`
