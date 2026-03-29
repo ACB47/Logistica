@@ -31,6 +31,8 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - El caso Cassandra de baja latencia ya queda cubierto con `logistica.vehicle_latest_state` y el loader `scripts/65_load_vehicle_latest_state_cassandra.sh`.
 - El pipeline streaming ya queda alineado al enunciado en ventanas de `15 minutes` y con checkpoints HDFS explicitos.
 - La estrategia de defensa ya queda decidida: `micro-batch documentado` como camino principal, con streaming real como evidencia complementaria.
+- Se detecto que la perdida intermitente de tablas Hive no era Cassandra sino el metastore local de Spark; ya queda mitigado con volumen persistente en `docker-compose*.yml` y un rebuild rapido en `scripts/66_rebuild_hive_demo_tables.sh`.
+- El error concreto de Derby (`metastore_db already exists`) queda corregido moviendo la persistencia a `derby.system.home=/home/jovyan/.derby` en el servicio `spark`.
 - Lo mas importante pendiente ahora es cerrar evidencias, Airflow visual, narrativa final de defensa y documentacion completa sobre la ruta Docker/local.
 
 ## Estado por fases KDD
@@ -155,6 +157,7 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
     - Hive `stg_weather_open_meteo`
     - Hive `dim_ports_routes_weather`
     - Hive `fact_weather_operational`
+    - Hive `fact_alerts`
     - Cassandra `vehicle_latest_state`
     - HDFS curated
     - GraphFrames `fact_graph_centrality`

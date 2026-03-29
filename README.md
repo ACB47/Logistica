@@ -59,6 +59,10 @@ El proyecto está **completamente dockerizado** para ejecutarse en cualquier ord
   - `bash scripts/63_run_weather_filtered_staging.sh full`
 - Carga Cassandra:
   - `bash scripts/65_load_vehicle_latest_state_cassandra.sh`
+- Rebuild rapido de tablas Hive demo tras reinicio:
+  - `bash scripts/66_rebuild_hive_demo_tables.sh`
+- Si Spark/Hive pierde tablas tras reinicio, recrear el contenedor `spark` para reabrir el metastore persistente:
+  - `docker-compose rm -sf spark && docker-compose up -d spark`
 
 ## Stack tecnológico (rúbrica cumplida)
 

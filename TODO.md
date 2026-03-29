@@ -149,6 +149,7 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
   - [x] Kafka topics.
   - [x] NiFi canvas.
   - [x] Hive tablas base (`stg_weather_open_meteo`, `dim_ports_routes_weather`, `fact_weather_operational`).
+  - [x] Hive alertas (`fact_alerts`).
   - [x] Cassandra consultas.
   - [x] HDFS curated.
   - [x] GraphFrames resultados.

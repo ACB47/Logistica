@@ -373,6 +373,7 @@ Estado actual de capturas ya realizadas en esta sesion:
 - NiFi: canvas + `InvokeHTTP` + `PublishKafka`
 - Kafka: consumo correcto de `datos_filtrados`
 - Hive: `stg_weather_open_meteo`, `dim_ports_routes_weather`, `fact_weather_operational`
+- Hive alertas: `fact_alerts`
 - Cassandra: `vehicle_latest_state`
 - HDFS curated: listado de `fact_weather_operational`, `fact_route_risk`, `fact_graph_centrality`
 - GraphFrames: `fact_graph_centrality`

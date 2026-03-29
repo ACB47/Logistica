@@ -57,15 +57,18 @@ services:
       - minio_data:/data
 
   spark:
-    image: bitnami/spark:3.5.0
-    ports:
-      - "8080:8080"
-      - "7077:7077"
+    image: jupyter/pyspark-notebook:latest
     environment:
-      SPARK_MODE: master
+      JAVA_TOOL_OPTIONS: -Dderby.system.home=/home/jovyan/.derby
+    ports:
+      - "8888:8888"
+      - "4040:4040"
+      - "8080:8080"
     volumes:
-      - ./jobs:/jobs
-      - ./ingesta:/ingesta
+      - ./jobs:/home/jovyan/jobs
+      - ./ingesta:/home/jovyan/ingesta
+      - spark_derby:/home/jovyan/.derby
+      - spark_warehouse_state:/home/jovyan/.spark-local-state
 
   cassandra:
     image: cassandra:5.0
@@ -119,3 +122,5 @@ volumes:
   cassandra_data:
   kafka_data:
   minio_data:
+  spark_derby:
+  spark_warehouse_state:

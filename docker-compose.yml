@@ -89,6 +89,8 @@ services:
 
   spark:
     image: jupyter/pyspark-notebook:latest
+    environment:
+      JAVA_TOOL_OPTIONS: -Dderby.system.home=/home/jovyan/.derby
     ports:
       - "8888:8888"
       - "4040:4040"
@@ -96,6 +98,8 @@ services:
     volumes:
       - ./jobs:/home/jovyan/jobs
       - ./ingesta:/home/jovyan/ingesta
+      - spark_derby:/home/jovyan/.derby
+      - spark_warehouse_state:/home/jovyan/.spark-local-state
     networks:
       - logistica-net
 
@@ -162,6 +166,8 @@ volumes:
   cassandra_data:
   kafka_data:
   postgres_data:
+  spark_derby:
+  spark_warehouse_state:
 
 networks:
   logistica-net:

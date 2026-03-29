@@ -52,6 +52,7 @@ Guidance for coding agents working in this repository.
 - Spark weather-port enrichment: `spark-submit jobs/spark/02_weather_port_enrichment.py`
 - Spark weather operational fact: `spark-submit jobs/spark/03_weather_operational_fact.py`
 - Spark latest vehicle state to Cassandra: `bash scripts/65_load_vehicle_latest_state_cassandra.sh`
+- Spark/Hive demo rebuild after restart: `bash scripts/66_rebuild_hive_demo_tables.sh`
 - Spark graph metrics: `spark-submit --packages graphframes:graphframes:0.8.3-spark3.5-s_2.12 jobs/spark/02_graph_metrics.py`
 - Spark score and alert: `spark-submit jobs/spark/03_score_and_alert.py`
 - Airflow webserver: `AIRFLOW_HOME=$PWD/.airflow airflow webserver --port 8080`
