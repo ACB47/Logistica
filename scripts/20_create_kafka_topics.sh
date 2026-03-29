@@ -19,6 +19,7 @@ TOPICS=(
   datos_crudos
   alertas_globales
   datos_filtrados
+  datos_filtrados_ok
 )
 
 for topic in "${TOPICS[@]}"; do

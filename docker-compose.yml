@@ -31,7 +31,7 @@ services:
     command: >
       bash -ec "
         sleep 15 &&
-        for topic in datos_crudos alertas_globales datos_filtrados; do
+        for topic in datos_crudos alertas_globales datos_filtrados datos_filtrados_ok; do
           /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1 --topic \"$$topic\";
         done &&
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list

@@ -33,6 +33,8 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - La estrategia de defensa ya queda decidida: `micro-batch documentado` como camino principal, con streaming real como evidencia complementaria.
 - Se detecto que la perdida intermitente de tablas Hive no era Cassandra sino el metastore local de Spark; ya queda mitigado con volumen persistente en `docker-compose*.yml` y un rebuild rapido en `scripts/66_rebuild_hive_demo_tables.sh`.
 - El error concreto de Derby (`metastore_db already exists`) queda corregido moviendo la persistencia a `derby.system.home=/home/jovyan/.derby` en el servicio `spark`.
+- `datos_filtrados_ok` ya queda incluido en la inicializacion automatica de Kafka para evitar fallos del rebuild tras reinicios.
+- El rebuild completo ya queda validado de nuevo: `fact_alerts` y el resto de tablas principales reaparecen correctamente tras `scripts/66_rebuild_hive_demo_tables.sh`.
 - Lo mas importante pendiente ahora es cerrar evidencias, Airflow visual, narrativa final de defensa y documentacion completa sobre la ruta Docker/local.
 
 ## Estado por fases KDD
@@ -209,11 +211,11 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - `docker-compose.simple.yml`
 
 ## Siguiente bloque recomendado
-1. Capturar para la memoria toda la cadena validada: NiFi -> `datos_filtrados` -> `stg_weather_open_meteo` -> `dim_ports_routes_weather` -> `fact_weather_operational` y el pipeline legacy `stg_ships` -> `fact_route_risk` -> `fact_alerts`, incluyendo dimensiones maestras Hive.
+1. Redactar la memoria final con las capturas ya reunidas.
 2. Afinar Airflow para cubrir reentrenamiento mensual y alertas de fallo de forma mas defendible.
 3. Dejar una ruta oficial de demo desde Docker completamente ensayada.
 4. Revisar SMTP y la demostracion visual de alertas/Airflow antes del cierre.
-5. Redactar la memoria final con las capturas ya reunidas.
+5. Hacer una pasada final de limpieza documental y de entrega.
 
 ## Regla de mantenimiento
 - Cada vez que se cierre un bloque de trabajo relevante, actualizar este archivo con:

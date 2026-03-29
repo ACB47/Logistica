@@ -30,6 +30,7 @@ def main() -> None:
         SparkSession.builder.appName("logistica-01-load-master-dimensions")
         .config("spark.hadoop.fs.defaultFS", "hdfs://namenode:8020")
         .config("spark.sql.warehouse.dir", "hdfs://namenode:8020/user/hive/warehouse")
+        .config("spark.sql.shuffle.partitions", "4")
         .enableHiveSupport()
         .getOrCreate()
     )
@@ -64,7 +65,13 @@ def main() -> None:
         spark.sql(f"DROP TABLE IF EXISTS {table_name}")
 
     for dataframe, table_name, path in targets:
-        dataframe.write.mode("overwrite").format("parquet").option("path", path).saveAsTable(table_name)
+        (
+            dataframe.coalesce(1)
+            .write.mode("overwrite")
+            .format("parquet")
+            .option("path", path)
+            .saveAsTable(table_name)
+        )
 
     print("OK - dimensiones maestras creadas")
     spark.sql("SHOW TABLES IN logistica").show(truncate=False)

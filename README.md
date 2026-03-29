@@ -25,7 +25,7 @@ El proyecto está **completamente dockerizado** para ejecutarse en cualquier ord
 
 ### Kafka
 - Bootstrap: `localhost:9092`
-- Topics: `datos_crudos`, `datos_filtrados`, `alertas_globales`
+- Topics: `datos_crudos`, `datos_filtrados`, `datos_filtrados_ok`, `alertas_globales`
 
 ### Detener
 ```bash

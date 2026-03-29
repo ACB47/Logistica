@@ -378,6 +378,7 @@ Estado actual de capturas ya realizadas en esta sesion:
 - HDFS curated: listado de `fact_weather_operational`, `fact_route_risk`, `fact_graph_centrality`
 - GraphFrames: `fact_graph_centrality`
 - Airflow: lista de DAGs + Graph de `logistica_kdd_microbatch` + Graph de `logistica_kdd_monthly_retrain`
+- Rebuild tras reinicio validado: `scripts/66_rebuild_hive_demo_tables.sh` restaura dimensiones, staging y facts principales
 
 **Kafka**
 
@@ -423,6 +424,13 @@ docker-compose exec -T spark spark-sql -e "SELECT * FROM logistica.dim_ports_rou
 docker-compose exec -T spark spark-sql -e "SELECT * FROM logistica.fact_weather_operational ORDER BY event_ts DESC LIMIT 5"
 docker-compose exec -T spark spark-sql -e "SELECT * FROM logistica.fact_alerts ORDER BY severity DESC LIMIT 5"
 docker-compose exec -T spark spark-sql -e "SELECT * FROM logistica.fact_graph_centrality ORDER BY degree DESC LIMIT 5"
+```
+
+Comprobacion recomendada tras reinicio:
+
+```bash
+bash scripts/66_rebuild_hive_demo_tables.sh
+docker-compose exec -T spark bash -lc 'spark-sql -S -e "SHOW TABLES IN logistica" 2>/dev/null'
 ```
 
 **Cassandra**

@@ -138,6 +138,7 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [ ] Crear un guion de demo de extremo a extremo de 5-10 minutos.
 - [ ] Verificar que no quedan credenciales reales hardcodeadas.
 - [ ] Sustituir placeholders SMTP y revisar `.env.example`.
+- [x] Estabilizar el rebuild tecnico tras reinicios: metastore Hive persistente + script `scripts/66_rebuild_hive_demo_tables.sh` validado.
 
 ## 8. Documentacion y memoria
 - [x] Ya existe `docs/00_documento_word.md` como base.
@@ -179,5 +180,6 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [x] Persistencia Cassandra demostrable para baja latencia.
 - [x] DAG Airflow ejecutado con exito y capturado.
 - [x] Al menos una alerta operativa generada y registrada.
+- [x] Rebuild tecnico reproducible tras reinicio validado.
 - [ ] Memoria completa con capturas.
 - [ ] Demo final ensayada.
