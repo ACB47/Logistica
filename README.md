@@ -97,7 +97,7 @@ El proyecto está **completamente dockerizado** para ejecutarse en cualquier ord
 | Módulo | Descripción |
 |---|---|
 | Ingesta (KDD) | NiFi consume Open-Meteo, publica en Kafka `datos_crudos` y `datos_filtrados`, y deja evidencia exportable del flujo. |
-| Procesamiento Spark | Spark genera staging en Hive, dimensiones maestras, enriquecimiento climático, facts operativas, alertas y análisis de grafos. |
+| Procesamiento Spark | Spark genera staging en Hive, dimensiones maestras, enriquecimiento climático, facts operativas, alertas, análisis de grafos y comparación barco vs aéreo+camión. |
 | Persistencia | Hive/HDFS para histórico, staging y curated. Cassandra para `vehicle_latest_state` de baja latencia. |
 | Dashboard | Dashboard Streamlit con estado de servicios, mapa, alertas, tablas clave y diagramas KDD/UML. |
 | Orquestación | Airflow con DAG principal `logistica_kdd_microbatch` y DAG mensual `logistica_kdd_monthly_retrain`. |
@@ -148,6 +148,7 @@ Open-Meteo -> NiFi -> Kafka (datos_crudos / datos_filtrados)
 | `logistica.dim_warehouse` | Hive dimensión | almacenes |
 | `logistica.dim_ports_routes_weather` | Hive enriquecida | clima + ruta + puerto |
 | `logistica.fact_weather_operational` | Hive fact | acción operativa final |
+| `logistica.fact_air_recovery_options` | Hive fact | comparación barco vs aéreo+camión, ETA y coste total |
 | `logistica.fact_route_risk` | Hive fact | riesgo por ruta |
 | `logistica.fact_graph_centrality` | Hive fact | criticidad de nodos |
 | `logistica.fact_alerts` | Hive fact | alertas operativas |
@@ -205,6 +206,32 @@ Logistica/
 - **Origen**: puerto Shanghai (China).
 - **Destino**: Algeciras / Valencia / Barcelona.
 - **Objetivo**: monitorizar barcos (GPS) y, si hay alertas (geopolítica o clima adverso), **avisar** para activar un plan de contingencia.
+
+## Caso de uso extendido: recuperación aérea hasta Valladolid
+
+El caso de uso principal se amplía con una capa de decisión logística orientada a contingencias. Cuando la ruta marítima entre Shanghai y los puertos españoles presenta riesgo operativo o amenaza el stock, el sistema compara:
+
+- la llegada restante del barco según su posición GPS actual
+- frente a una alternativa `aéreo + camión` hasta Valladolid
+
+La comparación contempla:
+
+- tiempo restante del barco hasta puerto y almacén
+- retraso meteorológico y portuario
+- tiempo de vuelo hasta aeropuertos españoles
+- tramo terrestre por camión hasta Valladolid
+- coste total del envío aéreo + camión
+- horas ganadas frente a la llegada marítima
+- riesgo de ruptura de stock
+
+Resultado persistido:
+
+- `logistica.fact_air_recovery_options`
+
+Recomendación final esperada:
+
+- `MARITIMO` si la ruta sigue siendo viable y más barata
+- `AEREO_CAMION` si la alternativa aérea evita rotura de stock y mejora el ETA con un coste justificable
 
 ## Pendiente para cierre completo de entrega
 

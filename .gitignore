@@ -1,4 +1,5 @@
 .venv-jobs/
+.venv-dashboard/
 __pycache__/
 *.pyc
 

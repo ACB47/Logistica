@@ -38,6 +38,7 @@ def main() -> None:
         "ships_latest": [],
         "fact_alerts": [],
         "fact_weather_operational": [],
+        "fact_air_recovery_options": [],
         "graph_centrality": [],
         "dim_ports": [],
         "dim_routes": [],
@@ -79,6 +80,12 @@ def main() -> None:
         payload["fact_weather_operational"] = rows_to_dicts(weather, limit=20)
     except Exception as exc:  # pragma: no cover
         errors.append(f"fact_weather_operational: {exc}")
+
+    try:
+        air_recovery = spark.table("logistica.fact_air_recovery_options").orderBy(col("time_saved_hours").desc())
+        payload["fact_air_recovery_options"] = rows_to_dicts(air_recovery, limit=20)
+    except Exception as exc:  # pragma: no cover
+        errors.append(f"fact_air_recovery_options: {exc}")
 
     try:
         centrality = spark.table("logistica.fact_graph_centrality").orderBy(col("degree").desc(), col("node_id"))

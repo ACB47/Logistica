@@ -24,6 +24,19 @@ SKUS = [
     ("SKU-SEA-001", "Carga maritima general", "standard", "contenedor 40ft", "active"),
 ]
 
+AIRPORTS = [
+    ("AIR-PVG", "Shanghai Pudong", "Shanghai", "CN", 31.1443, 121.8083, "origin_air_hub"),
+    ("AIR-MAD", "Adolfo Suarez Madrid-Barajas", "Madrid", "ES", 40.4893, -3.5676, "destination_airport"),
+    ("AIR-BCN", "Barcelona-El Prat", "Barcelona", "ES", 41.2974, 2.0833, "destination_airport"),
+    ("AIR-VLC", "Valencia Airport", "Valencia", "ES", 39.4893, -0.4816, "destination_airport"),
+]
+
+AIR_RECOVERY_CORRIDORS = [
+    ("AIRREC-PVG-MAD", "Shanghai Pudong", "Madrid", 17.0, 18400.0, 1.00, 225.0),
+    ("AIRREC-PVG-BCN", "Shanghai Pudong", "Barcelona", 16.0, 17600.0, 0.95, 690.0),
+    ("AIRREC-PVG-VLC", "Shanghai Pudong", "Valencia", 16.5, 17150.0, 0.93, 360.0),
+]
+
 
 def main() -> None:
     spark = (
@@ -53,12 +66,30 @@ def main() -> None:
         SKUS,
         ["sku_id", "sku_name", "sku_family", "packaging", "status"],
     )
+    dim_airports = spark.createDataFrame(
+        AIRPORTS,
+        ["airport_id", "airport_name", "city_name", "country_code", "lat", "lon", "airport_type"],
+    )
+    dim_air_recovery = spark.createDataFrame(
+        AIR_RECOVERY_CORRIDORS,
+        [
+            "air_recovery_id",
+            "origin_airport",
+            "dest_city",
+            "air_eta_hours",
+            "air_cost_eur",
+            "air_co2_factor",
+            "truck_km_to_warehouse",
+        ],
+    )
 
     targets = [
         (dim_ports, "logistica.dim_ports", "hdfs://namenode:8020/hadoop/logistica/master/dim_ports"),
         (dim_routes, "logistica.dim_routes", "hdfs://namenode:8020/hadoop/logistica/master/dim_routes"),
         (dim_warehouse, "logistica.dim_warehouse", "hdfs://namenode:8020/hadoop/logistica/master/dim_warehouse"),
         (dim_skus, "logistica.dim_skus", "hdfs://namenode:8020/hadoop/logistica/master/dim_skus"),
+        (dim_airports, "logistica.dim_airports", "hdfs://namenode:8020/hadoop/logistica/master/dim_airports"),
+        (dim_air_recovery, "logistica.dim_air_recovery", "hdfs://namenode:8020/hadoop/logistica/master/dim_air_recovery"),
     ]
 
     for _, table_name, _ in targets:

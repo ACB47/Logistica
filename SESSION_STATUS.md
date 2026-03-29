@@ -36,6 +36,7 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - `datos_filtrados_ok` ya queda incluido en la inicializacion automatica de Kafka para evitar fallos del rebuild tras reinicios.
 - El rebuild completo ya queda validado de nuevo: `fact_alerts` y el resto de tablas principales reaparecen correctamente tras `scripts/66_rebuild_hive_demo_tables.sh`.
 - Ya existe una base de dashboard en `Streamlit` con mapa, diagramas, estado de servicios y tablas clave para la defensa.
+- Ya existe en codigo un nuevo caso de uso de contingencia: comparacion `barco vs aereo+camion` hasta Valladolid mediante `jobs/spark/03_air_recovery_options.py`.
 - Lo mas importante pendiente ahora es cerrar evidencias, Airflow visual, narrativa final de defensa y documentacion completa sobre la ruta Docker/local.
 
 ## Estado por fases KDD
@@ -132,8 +133,10 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
     - `ship-003 | Barcelona | stock 95 | reorder 30`
   - `jobs/spark/04_streaming_ml_pipeline.py` actualizado a ventanas de `15 minutes`
   - checkpoints streaming alineados a `hdfs://namenode:8020/hadoop/logistica/checkpoint/...`
+  - modelado un caso de recuperacion aerea con comparacion de ETA, coste total y riesgo de stock
 - Falta para cerrar:
   - integracion completa de alertas y pruebas de extremo a extremo
+  - validar y poblar `logistica.fact_air_recovery_options`
 
 ### Fase IV - Orquestacion
 - Estado: parcial y utilizable.

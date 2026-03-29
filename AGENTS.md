@@ -51,6 +51,7 @@ Guidance for coding agents working in this repository.
 - Spark weather filtered-to-staging: `spark-submit jobs/spark/01_weather_filtered_to_staging.py --bootstrap kafka:9092 --topic datos_filtrados`
 - Spark weather-port enrichment: `spark-submit jobs/spark/02_weather_port_enrichment.py`
 - Spark weather operational fact: `spark-submit jobs/spark/03_weather_operational_fact.py`
+- Spark air recovery options: `spark-submit jobs/spark/03_air_recovery_options.py`
 - Spark latest vehicle state to Cassandra: `bash scripts/65_load_vehicle_latest_state_cassandra.sh`
 - Spark/Hive demo rebuild after restart: `bash scripts/66_rebuild_hive_demo_tables.sh`
 - Spark graph metrics: `spark-submit --packages graphframes:graphframes:0.8.3-spark3.5-s_2.12 jobs/spark/02_graph_metrics.py`
@@ -88,6 +89,7 @@ Guidance for coding agents working in this repository.
   - `spark-submit jobs/spark/01_weather_filtered_to_staging.py --bootstrap kafka:9092 --topic datos_filtrados`
   - `spark-submit jobs/spark/02_weather_port_enrichment.py`
   - `spark-submit jobs/spark/03_weather_operational_fact.py`
+  - `spark-submit jobs/spark/03_air_recovery_options.py`
   - `spark-submit --packages graphframes:graphframes:0.8.3-spark3.5-s_2.12 jobs/spark/02_graph_metrics.py`
 
 ## Single-Test Guidance

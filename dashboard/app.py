@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import subprocess
 from pathlib import Path
@@ -24,717 +23,253 @@ SERVICE_MAP = {
     "airflow": "logistica_airflow-webserver_1",
 }
 
-KDD_MERMAID = r"""
-flowchart LR
-    A[API publica Open-Meteo] --> B[NiFi]
-    B --> C[Kafka datos_crudos]
-    B --> D[Kafka datos_filtrados]
-    C --> E[HDFS raw]
-    D --> F[Spark staging clima]
-    F --> G[Hive stg_weather_open_meteo]
-    G --> H[Dimensiones Hive]
-    H --> I[dim_ports_routes_weather]
-    I --> J[fact_weather_operational]
-    E --> K[stg_ships / alerts]
-    K --> L[GraphFrames]
-    L --> M[fact_route_risk / fact_graph_centrality]
-    M --> N[fact_alerts]
-    K --> O[Cassandra vehicle_latest_state]
-    J --> P[Airflow]
-    N --> P
-    O --> P
-"""
-
-SEQUENCE_MERMAID = r"""
-sequenceDiagram
-    participant API as Open-Meteo API
-    participant NiFi as NiFi
-    participant Kafka as Kafka
-    participant Spark as Spark
-    participant Hive as Hive/HDFS
-    participant Cass as Cassandra
-    participant Airflow as Airflow
-
-    API->>NiFi: GET weather snapshot
-    NiFi->>Kafka: Publica datos_crudos
-    NiFi->>Kafka: Publica datos_filtrados
-    Kafka->>Spark: Lee topic datos_filtrados_ok
-    Spark->>Hive: Crea staging y facts weather
-    Spark->>Hive: Crea grafos y alertas
-    Spark->>Cass: Carga vehicle_latest_state
-    Airflow->>Spark: Orquesta micro-batches
-"""
-
-CLASS_MERMAID = r"""
-classDiagram
-    class Port {
-      +port_id
-      +port_name
-      +macro_region
-      +lat
-      +lon
-    }
-    class Route {
-      +route_id
-      +origin_port
-      +dest_port
-      +route_mode
-      +sea_hours_estimate
-    }
-    class WeatherEvent {
-      +event_ts
-      +temperature_c
-      +humidity_pct
-      +wind_speed_kmh
-      +severity
-    }
-    class OperationalAlert {
-      +via_port
-      +risk_level
-      +stock_status
-      +recommendation
-      +severity
-    }
-    class VehicleLatestState {
-      +ship_id
-      +route_id
-      +dest_port
-      +stock_on_hand
-    }
-    Route --> Port
-    WeatherEvent --> Port
-    OperationalAlert --> Route
-    VehicleLatestState --> Route
-"""
-
-USE_CASE_MERMAID = r"""
-flowchart TB
-    U1([Profesor / Tribunal]) --> UC1[Ver arquitectura KDD]
-    U1 --> UC2[Ver estado de servicios]
-    U1 --> UC3[Ver mapa de barcos y rutas]
-    U1 --> UC4[Ver alertas operativas]
-    U1 --> UC5[Ver grafos y nodos criticos]
-    U1 --> UC6[Arrancar / parar stack]
-"""
-
 CUSTOM_CSS = """
 <style>
-    .stApp {
-        background: radial-gradient(circle at top left, #17345c 0%, #0b1220 45%, #070b13 100%);
-        color: #e5eefb;
-    }
-    .stApp, .stApp * {
-        color: #e5eefb;
-    }
-    [data-testid="stAppViewContainer"],
-    [data-testid="stHeader"],
-    [data-testid="stToolbar"],
-    [data-testid="stSidebar"],
-    [data-testid="stSidebar"] *,
-    [data-testid="stMainBlockContainer"],
-    [data-testid="stMainBlockContainer"] *,
-    section[data-testid="stSidebar"] *,
-    div[data-testid="stVerticalBlock"] *,
-    div[data-testid="stHorizontalBlock"] * {
-        color: #e5eefb !important;
-    }
-    .block-container {
-        padding-top: 1.2rem;
-        padding-bottom: 2rem;
-        max-width: 1500px;
-    }
-    h1, h2, h3, h4, h5, h6, p, li, span, label {
-        color: #e5eefb !important;
-        font-family: "Inter", sans-serif;
-    }
-    div[data-testid="stMetric"] {
-        background: linear-gradient(180deg, rgba(16,27,52,0.95), rgba(10,18,34,0.94));
-        border: 1px solid rgba(125, 211, 252, 0.12);
-        padding: 1rem;
-        border-radius: 1rem;
-        box-shadow: 0 12px 32px rgba(0,0,0,0.22);
-    }
-    div[data-testid="stDataFrame"], div[data-testid="stTable"] {
-        background: rgba(8, 15, 29, 0.72);
-        border: 1px solid rgba(125, 211, 252, 0.1);
-        border-radius: 1rem;
-        padding: 0.5rem;
-    }
-    div[data-baseweb="tab-list"] button {
-        color: #d9e7ff !important;
-        background: rgba(255,255,255,0.04) !important;
-        border-radius: 12px 12px 0 0 !important;
-    }
-    div[data-baseweb="tab-list"] button[aria-selected="true"] {
-        color: #ffffff !important;
-        background: rgba(98, 210, 198, 0.12) !important;
-    }
-    .stButton button {
-        color: #edf5ff !important;
-        border: 1px solid rgba(125, 211, 252, 0.18) !important;
-        background: linear-gradient(180deg, rgba(17,34,62,0.92), rgba(9,18,35,0.92)) !important;
-    }
-    .stButton button:hover {
-        border-color: rgba(98, 210, 198, 0.45) !important;
-        color: #ffffff !important;
-    }
-    [data-testid="stMetricLabel"],
-    [data-testid="stMetricValue"],
-    [data-testid="stMetricDelta"],
-    [data-testid="stMarkdownContainer"],
-    [data-testid="stCaptionContainer"],
-    [data-testid="stText"],
-    [data-testid="stSubheader"],
-    [data-testid="stHeaderActionElements"],
-    [data-testid="stExpander"],
-    [data-testid="stExpander"] *,
-    [data-testid="stTabs"] *,
-    [data-testid="stSidebarNav"] *,
-    [data-testid="stNotificationContent"] *,
-    [data-testid="stException"] *,
-    [data-testid="stAlertContainer"] *,
-    [data-testid="stCodeBlock"] *,
-    [data-testid="stCheckbox"] *,
-    [data-testid="stRadio"] *,
-    [data-testid="stSelectbox"] *,
-    [data-testid="stMultiSelect"] *,
-    [data-testid="stTextInput"] *,
-    [data-testid="stNumberInput"] *,
-    [data-testid="stFileUploader"] *,
-    .stAlert,
-    .stCode,
-    .stText,
-    .element-container,
-    .element-container *,
-    .st-emotion-cache-1kyxreq,
-    .st-emotion-cache-1kyxreq *,
-    .st-emotion-cache-z5fcl4,
-    .st-emotion-cache-z5fcl4 *,
-    .st-emotion-cache-10trblm,
-    .st-emotion-cache-1wivap2,
-    .st-emotion-cache-16txtl3,
-    .st-emotion-cache-ue6h4q {
-        color: #e5eefb !important;
-    }
-    .stDataFrame table, .stTable table {
-        color: #e5eefb !important;
-        background: transparent !important;
-    }
-    .stDataFrame thead tr th, .stTable thead tr th {
-        color: #9fd8ff !important;
-        background: rgba(255,255,255,0.03) !important;
-    }
-    .stDataFrame tbody tr td, .stTable tbody tr td {
-        color: #e5eefb !important;
-    }
-    .stDataFrame [role="gridcell"],
-    .stDataFrame [role="columnheader"],
-    .stDataFrame [role="rowheader"],
-    .stDataEditor [role="gridcell"],
-    .stDataEditor [role="columnheader"],
-    .stDataEditor [role="rowheader"] {
-        color: #e5eefb !important;
-    }
-    svg text,
-    svg tspan,
-    .mermaid text,
-    .mermaid tspan,
-    .mermaid span,
-    .mermaid foreignObject,
-    .mermaid foreignObject * {
-        fill: #e5eefb !important;
-        color: #e5eefb !important;
-    }
-    .mermaid .nodeLabel,
-    .mermaid .edgeLabel,
-    .mermaid .label,
-    .mermaid .cluster-label text {
-        color: #e5eefb !important;
-        fill: #e5eefb !important;
-    }
-    a, a:visited, a:hover {
-        color: #86d7ff !important;
-    }
-    code, pre {
-        color: #f1f5f9 !important;
-    }
-    .glass-card {
-        background: linear-gradient(180deg, rgba(13,23,43,0.96), rgba(8,14,28,0.92));
-        border: 1px solid rgba(125, 211, 252, 0.14);
-        border-radius: 22px;
-        padding: 20px 22px;
-        box-shadow: 0 18px 48px rgba(0,0,0,0.25);
-    }
-    .hero-eyebrow {
-        color: #62d2c6 !important;
-        font-size: 0.8rem;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-        margin-bottom: 0.2rem;
-    }
-    .hero-title {
-        font-size: 4rem;
-        line-height: 0.95;
-        font-weight: 800;
-        margin: 0;
-    }
-    .hero-subtitle {
-        color: #a6b7d5 !important;
-        font-size: 1rem;
-        max-width: 760px;
-        margin-top: 0.8rem;
-    }
-    .tag-chip {
-        display: inline-block;
-        padding: 8px 14px;
-        margin: 6px 8px 0 0;
-        border-radius: 999px;
-        border: 1px solid rgba(255,255,255,0.1);
-        background: rgba(255,255,255,0.03);
-        color: #d7e6ff !important;
-        font-size: 0.86rem;
-    }
-    .tiny-label {
-        color: #8aa4c9 !important;
-        font-size: 0.72rem;
-        text-transform: uppercase;
-        letter-spacing: 0.15em;
-    }
-    .big-number {
-        font-size: 3rem;
-        font-weight: 800;
-        margin-top: 0.3rem;
-    }
-    .status-pill {
-        display: inline-block;
-        border-radius: 999px;
-        padding: 6px 12px;
-        font-size: 0.8rem;
-        font-weight: 700;
-    }
-    .pill-ok { background: rgba(34,197,94,0.16); color: #86efac !important; }
-    .pill-warn { background: rgba(245,158,11,0.16); color: #fcd34d !important; }
-    .pill-danger { background: rgba(239,68,68,0.16); color: #fca5a5 !important; }
-    .pill-off { background: rgba(148,163,184,0.14); color: #cbd5e1 !important; }
+  .stApp {
+    background: linear-gradient(180deg, #eef4fb 0%, #dfeaf7 45%, #d5e4f5 100%);
+    color: #10233f;
+  }
+  .block-container {
+    padding-top: 1rem;
+    padding-bottom: 2rem;
+    max-width: 1500px;
+  }
+  h1, h2, h3, h4, h5, h6, p, li, span, label, div {
+    color: #10233f;
+    font-family: Inter, sans-serif;
+  }
+  .hero-eyebrow {
+    color: #0f766e !important;
+    font-size: 0.78rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 0.2rem;
+    font-weight: 700;
+  }
+  .hero-title {
+    font-size: 4rem;
+    line-height: 0.94;
+    font-weight: 800;
+    margin: 0;
+    color: #10233f !important;
+  }
+  .hero-subtitle {
+    color: #38597c !important;
+    font-size: 1rem;
+    margin-top: 0.8rem;
+    max-width: 760px;
+  }
+  .tag-chip {
+    display: inline-block;
+    padding: 8px 14px;
+    margin: 6px 8px 0 0;
+    border-radius: 999px;
+    border: 1px solid rgba(15, 76, 129, 0.15);
+    background: rgba(255, 255, 255, 0.65);
+    color: #17345c !important;
+    font-size: 0.86rem;
+  }
+  .card {
+    background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(240,246,252,0.95));
+    border: 1px solid rgba(15, 76, 129, 0.12);
+    border-radius: 22px;
+    padding: 18px 20px;
+    box-shadow: 0 14px 38px rgba(15, 23, 42, 0.08);
+  }
+  .card-title {
+    color: #567697 !important;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+  }
+  .card-value {
+    color: #10233f !important;
+    font-size: 3rem;
+    font-weight: 800;
+    margin-top: 0.25rem;
+  }
+  .card-sub {
+    color: #4b617c !important;
+    margin-top: 0.2rem;
+    font-size: 0.94rem;
+  }
+  div[data-baseweb="tab-list"] button {
+    color: #17345c !important;
+    background: rgba(255,255,255,0.5) !important;
+    border-radius: 14px 14px 0 0 !important;
+  }
+  div[data-baseweb="tab-list"] button[aria-selected="true"] {
+    background: rgba(255,255,255,0.95) !important;
+    color: #0f172a !important;
+  }
+  .stButton button {
+    color: #10233f !important;
+    background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(233,241,250,0.98)) !important;
+    border: 1px solid rgba(15,76,129,0.16) !important;
+  }
+  .stDataFrame, .stTable {
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .status-pill {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+  .ok { background: rgba(34,197,94,0.15); color: #166534 !important; }
+  .warn { background: rgba(245,158,11,0.18); color: #92400e !important; }
+  .nok { background: rgba(239,68,68,0.16); color: #991b1b !important; }
+  .off { background: rgba(148,163,184,0.16); color: #334155 !important; }
 </style>
 """
 
 
-def run_command(command: list[str], timeout: int = 120, check: bool = False) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        command,
-        cwd=ROOT,
-        text=True,
-        capture_output=True,
-        timeout=timeout,
-        check=check,
-    )
+def run_command(command: list[str], timeout: int = 120) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(command, cwd=ROOT, text=True, capture_output=True, timeout=timeout)
 
 
-def render_mermaid(title: str, code: str) -> None:
-    diagram_id = f"mermaid-{hashlib.md5(title.encode('utf-8')).hexdigest()[:10]}"
-    code_json = json.dumps(code)
+def render_card(title: str, value: str, subtitle: str, height: int = 155) -> None:
     components.html(
         f"""
-        <div style=\"background:linear-gradient(180deg, rgba(12,20,38,0.97), rgba(8,14,28,0.96));padding:18px;border-radius:20px;border:1px solid rgba(125,211,252,0.14);box-shadow:0 18px 48px rgba(0,0,0,0.25);\">
-          <div style=\"color:#8ecfe0;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;margin-bottom:6px;font-family:Inter,sans-serif;\">Diagrama</div>
-          <h3 style=\"color:white;font-family:Inter,sans-serif;margin:0 0 12px 0;\">{title}</h3>
-          <div id=\"{diagram_id}\" style=\"overflow:auto;background:rgba(255,255,255,0.02);border-radius:16px;padding:10px;\"></div>
+        <div class="card">
+          <div class="card-title">{title}</div>
+          <div class="card-value">{value}</div>
+          <div class="card-sub">{subtitle}</div>
         </div>
-        <script type=\"module\">
-          import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-          const definition = {code_json};
-          mermaid.initialize({{
-            startOnLoad: false,
-            theme: 'dark',
-            securityLevel: 'loose',
-            themeVariables: {{
-              background: '#0b1220',
-              primaryColor: '#133657',
-              primaryTextColor: '#e5eefb',
-              primaryBorderColor: '#62d2c6',
-              lineColor: '#7dd3fc',
-              secondaryColor: '#111c31',
-              tertiaryColor: '#0f172a',
-              fontFamily: 'Inter, sans-serif'
-            }}
-          }});
-          const el = document.getElementById('{diagram_id}');
-          mermaid.render('{diagram_id}-svg', definition).then((result) => {{
-            el.innerHTML = result.svg;
-          }}).catch((error) => {{
-            el.innerHTML = `<div style="color:#fca5a5;font-family:Inter,sans-serif;padding:12px;">No se pudo renderizar el diagrama.<br/>${{String(error)}}</div>`;
-          }});
-        </script>
         """,
-        height=460,
+        height=height,
     )
 
 
-def render_html_card(html: str, height: int = 180) -> None:
-    components.html(f"<div class='glass-card'>{html}</div>", height=height)
-
-
-def render_metric_card(title: str, value: str, subtitle: str) -> None:
-    render_html_card(
+def render_panel(title: str, subtitle: str, body: str, height: int = 230) -> None:
+    components.html(
         f"""
-        <div class='tiny-label'>{title}</div>
-        <div class='big-number'>{value}</div>
-        <div style='color:#8aa4c9;margin-top:0.3rem'>{subtitle}</div>
-        """,
-        height=170,
-    )
-
-
-@st.cache_data(ttl=15)
-def get_service_status() -> list[dict[str, str]]:
-    result = run_command(["docker", "ps", "-a", "--format", "{{.Names}}\t{{.Status}}"])
-    status_by_name: dict[str, str] = {}
-    for line in result.stdout.splitlines():
-        if "\t" in line:
-            name, status = line.split("\t", 1)
-            status_by_name[name] = status
-
-    rows = []
-    for service, container_name in SERVICE_MAP.items():
-        raw_status = status_by_name.get(container_name, "Not created")
-        if "healthy" in raw_status.lower() or raw_status.startswith("Up"):
-            badge = "OK"
-        elif "Restarting" in raw_status or "Exited" in raw_status:
-            badge = "NOK"
-        elif raw_status == "Not created":
-            badge = "OFF"
-        else:
-            badge = "BOOT"
-        rows.append({"service": service, "container": container_name, "status": raw_status, "badge": badge})
-    return rows
-
-
-def compose_service_action(service: str, action: str) -> str:
-    if action == "start":
-        result = run_command(DOCKER_COMPOSE + ["up", "-d", service], timeout=600)
-    else:
-        result = run_command(DOCKER_COMPOSE + ["stop", service], timeout=300)
-    st.cache_data.clear()
-    return result.stdout or result.stderr or f"{action} {service} ejecutado"
-
-
-def run_script(script: str) -> str:
-    result = run_command(["bash", script], timeout=1200)
-    st.cache_data.clear()
-    return result.stdout or result.stderr
-
-
-@st.cache_data(ttl=60)
-def get_dashboard_bundle() -> dict:
-    command = DOCKER_COMPOSE + [
-        "exec",
-        "-T",
-        "spark",
-        "spark-submit",
-        "/home/jovyan/jobs/spark/99_dashboard_bundle.py",
-    ]
-    result = run_command(command, timeout=600)
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr or "No se pudo consultar el bundle del dashboard")
-
-    lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    json_line = next((line for line in reversed(lines) if line.startswith("{") and line.endswith("}")), None)
-    if not json_line:
-        raise RuntimeError("No se encontro salida JSON valida del bundle del dashboard")
-    return json.loads(json_line)
-
-
-def build_map_data(bundle: dict) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    ports = pd.DataFrame(bundle.get("dim_ports", []))
-    routes = pd.DataFrame(bundle.get("dim_routes", []))
-    ships = pd.DataFrame(bundle.get("ships_latest", []))
-    alerts = pd.DataFrame(bundle.get("fact_alerts", []))
-
-    if not routes.empty and not ports.empty:
-        port_lookup = ports[["port_name", "lat", "lon"]].rename(
-            columns={"lat": "origin_lat", "lon": "origin_lon"}
-        )
-        routes = routes.merge(port_lookup, left_on="origin_port", right_on="port_name", how="left").drop(columns=["port_name"])
-        dest_lookup = ports[["port_name", "lat", "lon"]].rename(
-            columns={"port_name": "dest_port", "lat": "dest_lat", "lon": "dest_lon"}
-        )
-        routes = routes.merge(dest_lookup, on="dest_port", how="left")
-
-    if not alerts.empty and not routes.empty:
-        routes = routes.merge(alerts[["via_port", "severity", "risk_level"]], left_on="dest_port", right_on="via_port", how="left")
-        routes["severity"] = routes["severity"].fillna(1)
-    else:
-        routes["severity"] = 1
-
-    if not routes.empty:
-        routes["color"] = routes["severity"].apply(
-            lambda sev: [220, 38, 38] if sev >= 4 else [245, 158, 11] if sev >= 3 else [59, 130, 246]
-        )
-
-    if not ships.empty:
-        ships["tooltip"] = ships.apply(
-            lambda row: f"{row['ship_id']} | {row['dest_port']} | {row['route_id']}", axis=1
-        )
-
-    return ports, routes, ships
-
-
-def summarize_risk(bundle: dict) -> tuple[int, int, float]:
-    alerts = pd.DataFrame(bundle.get("fact_alerts", []))
-    weather = pd.DataFrame(bundle.get("fact_weather_operational", []))
-    critical = int((alerts["severity"] >= 4).sum()) if not alerts.empty else 0
-    medium = int((alerts["severity"] >= 2).sum()) if not alerts.empty else 0
-    avg_delay = float(weather["weather_delay_hours_estimate"].mean()) if not weather.empty else 0.0
-    return critical, medium, avg_delay
-
-
-def build_service_badge(badge: str) -> str:
-    if badge == "OK":
-        return "pill-ok"
-    if badge == "NOK":
-        return "pill-danger"
-    if badge == "BOOT":
-        return "pill-warn"
-    return "pill-off"
-
-
-st.set_page_config(page_title="Dashboard KDD Logistica", layout="wide")
-st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
-
-with st.sidebar:
-    st.subheader("Controles")
-    if st.button("Refrescar dashboard"):
-        st.cache_data.clear()
-        st.rerun()
-    if st.button("Levantar stack completo"):
-        st.code(run_command(["docker-compose", "up", "-d", "postgres", "kafka", "nifi", "spark", "cassandra", "namenode", "datanode", "airflow-webserver"], timeout=600).stdout)
-        st.cache_data.clear()
-    if st.button("Parar stack completo"):
-        st.code(run_command(["docker-compose", "down"], timeout=600).stdout)
-        st.cache_data.clear()
-    if st.button("Rebuild tablas Hive demo"):
-        st.code(run_script("scripts/66_rebuild_hive_demo_tables.sh")[-3000:])
-    if st.button("Cargar Cassandra latest state"):
-        st.code(run_script("scripts/65_load_vehicle_latest_state_cassandra.sh")[-3000:])
-
-bundle = get_dashboard_bundle()
-service_rows = get_service_status()
-
-ok_count = sum(1 for row in service_rows if row["badge"] == "OK")
-nok_count = sum(1 for row in service_rows if row["badge"] == "NOK")
-off_count = sum(1 for row in service_rows if row["badge"] == "OFF")
-critical_alerts, medium_alerts, avg_delay = summarize_risk(bundle)
-
-hero_left, hero_right = st.columns([1.7, 0.9])
-with hero_left:
-    st.markdown("<div class='hero-eyebrow'>BIG DATA TRANSPORT MONITOR</div>", unsafe_allow_html=True)
-    st.markdown("<div class='hero-title'>Transport Pulse<br/>Dashboard</div>", unsafe_allow_html=True)
-    st.markdown(
-        "<div class='hero-subtitle'>Centro de control del pipeline KDD: posicion de flota, riesgo meteorologico, alertas operativas, estado de servicios y analitica de red para la logistica maritima.</div>",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        """
-        <div>
-          <span class='tag-chip'>NiFi</span>
-          <span class='tag-chip'>Kafka</span>
-          <span class='tag-chip'>Spark + Hive</span>
-          <span class='tag-chip'>Cassandra</span>
-          <span class='tag-chip'>GraphFrames</span>
-          <span class='tag-chip'>Airflow</span>
-          <span class='tag-chip'>Open-Meteo</span>
+        <div class="card">
+          <div class="card-title">{subtitle}</div>
+          <h3 style="margin:0.2rem 0 0.8rem 0;color:#10233f;">{title}</h3>
+          <div style="color:#38597c;">{body}</div>
         </div>
         """,
-        unsafe_allow_html=True,
+        height=height,
     )
-with hero_right:
-    render_html_card(
+
+
+def render_diagram(title: str, subtitle: str, svg: str, height: int = 420) -> None:
+    components.html(
         f"""
-        <div class='tiny-label'>sincronizado</div>
-        <h3 style='margin:6px 0 10px 0'>Estado del pipeline</h3>
-        <p style='color:#9db2d5'>Snapshots servidos desde Spark/Hive, HDFS y Cassandra con control en vivo de servicios Docker.</p>
-        <div style='display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px'>
-          <div><div class='tiny-label'>Pipeline</div><strong>En seguimiento</strong></div>
-          <div><div class='tiny-label'>Riesgo medio</div><strong>{'MEDIUM' if medium_alerts else 'LOW'}</strong></div>
-          <div><div class='tiny-label'>Servicios OK</div><strong>{ok_count}/{len(service_rows)}</strong></div>
-          <div><div class='tiny-label'>Storage</div><strong>HDFS + Hive</strong></div>
+        <div class="card" style="padding:18px;">
+          <div class="card-title">{subtitle}</div>
+          <h3 style="margin:0.2rem 0 0.8rem 0;color:#10233f;">{title}</h3>
+          <div style="background:rgba(15,76,129,0.04);border-radius:16px;padding:10px;overflow:auto;">{svg}</div>
         </div>
         """,
-        height=260,
+        height=height,
     )
 
-metric_cols = st.columns(6)
-with metric_cols[0]:
-    render_metric_card("Flota monitorizada", str(len(bundle.get("ships_latest", []))), "Ultimo estado por vehiculo")
-with metric_cols[1]:
-    render_metric_card("Rutas bajo observacion", str(len(bundle.get("fact_alerts", []))), "Alertas operativas disponibles")
-with metric_cols[2]:
-    render_metric_card("Riesgo meteo alto/medio", str(medium_alerts), "Fact weather operational")
-with metric_cols[3]:
-    render_metric_card("Retraso medio actual", f"{avg_delay:.1f}h", "Sobre rutas con contexto")
-with metric_cols[4]:
-    render_metric_card("Servicios NOK", str(nok_count), "Contenedores con incidencia")
-with metric_cols[5]:
-    render_metric_card("Vehiculos impactados", str(critical_alerts), "Alertas severidad >= 4")
 
-tab_overview, tab_diagrams, tab_map, tab_ops = st.tabs([
-    "Resumen KDD",
-    "Diagramas",
-    "Mapa y Alertas",
-    "Servicios",
-])
+def flow_diagram_svg() -> str:
+    return """
+    <svg viewBox="0 0 1200 360" width="100%" height="360" xmlns="http://www.w3.org/2000/svg">
+      <defs><marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#0f4c81"/></marker></defs>
+      <style>
+        .n{fill:#ffffff;stroke:#7dd3fc;stroke-width:2;rx:18;ry:18}
+        .t{fill:#10233f;font:600 14px Inter,sans-serif;text-anchor:middle;dominant-baseline:middle}
+        .l{stroke:#0f4c81;stroke-width:3;fill:none;marker-end:url(#a)}
+      </style>
+      <rect class="n" x="20" y="54" width="150" height="56"/><text class="t" x="95" y="82">Open-Meteo</text>
+      <rect class="n" x="210" y="54" width="115" height="56"/><text class="t" x="267" y="82">NiFi</text>
+      <rect class="n" x="360" y="18" width="180" height="56"/><text class="t" x="450" y="46">Kafka datos_crudos</text>
+      <rect class="n" x="360" y="110" width="180" height="56"/><text class="t" x="450" y="138">Kafka datos_filtrados</text>
+      <rect class="n" x="590" y="18" width="170" height="56"/><text class="t" x="675" y="46">HDFS raw</text>
+      <rect class="n" x="590" y="110" width="190" height="56"/><text class="t" x="685" y="138">Spark staging clima</text>
+      <rect class="n" x="840" y="18" width="190" height="56"/><text class="t" x="935" y="46">Hive / HDFS curated</text>
+      <rect class="n" x="840" y="110" width="190" height="56"/><text class="t" x="935" y="138">GraphFrames + facts</text>
+      <rect class="n" x="840" y="202" width="190" height="56"/><text class="t" x="935" y="230">Cassandra latest state</text>
+      <rect class="n" x="1080" y="110" width="100" height="56"/><text class="t" x="1130" y="138">Airflow</text>
+      <path class="l" d="M170 82 L210 82"/><path class="l" d="M325 82 L360 46"/><path class="l" d="M325 82 L360 138"/>
+      <path class="l" d="M540 46 L590 46"/><path class="l" d="M540 138 L590 138"/>
+      <path class="l" d="M780 138 L840 46"/><path class="l" d="M780 138 L840 138"/><path class="l" d="M780 138 L840 230"/>
+      <path class="l" d="M1030 46 L1080 138"/><path class="l" d="M1030 138 L1080 138"/><path class="l" d="M1030 230 L1080 138"/>
+    </svg>
+    """
 
-with tab_overview:
-    st.subheader("Requisitos y evidencias de la rubrica")
-    st.markdown(
-        """
-        - Ingesta real con **NiFi + Kafka** usando `datos_crudos` y `datos_filtrados`.
-        - Persistencia en **HDFS/Hive** con staging, dimensiones y facts curadas.
-        - Analitica de **GraphFrames** con hops y criticidad por grado.
-        - Baja latencia en **Cassandra** con `vehicle_latest_state`.
-        - Orquestacion en **Airflow** con DAG microbatch y DAG mensual.
-        - Defensa oficial sobre **Docker/local** con estrategia de **micro-batch documentado**.
-        """
-    )
 
-    if bundle.get("errors"):
-        st.warning("Datasets no disponibles en este refresco:")
-        for error in bundle["errors"]:
-            st.write(f"- {error}")
+def sequence_diagram_svg() -> str:
+    return """
+    <svg viewBox="0 0 1120 360" width="100%" height="360" xmlns="http://www.w3.org/2000/svg">
+      <defs><marker id="b" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#0f4c81"/></marker></defs>
+      <style>
+        .box{fill:#ffffff;stroke:#7dd3fc;stroke-width:2;rx:12}
+        .txt{fill:#10233f;font:600 13px Inter,sans-serif;text-anchor:middle}
+        .line{stroke:#94a3b8;stroke-width:1.5;stroke-dasharray:5 5}
+        .msg{stroke:#0f4c81;stroke-width:2.5;marker-end:url(#b)}
+        .lbl{fill:#10233f;font:12px Inter,sans-serif}
+      </style>
+      <rect class="box" x="20" y="20" width="100" height="34"/><text class="txt" x="70" y="42">API</text>
+      <rect class="box" x="170" y="20" width="100" height="34"/><text class="txt" x="220" y="42">NiFi</text>
+      <rect class="box" x="320" y="20" width="100" height="34"/><text class="txt" x="370" y="42">Kafka</text>
+      <rect class="box" x="470" y="20" width="100" height="34"/><text class="txt" x="520" y="42">Spark</text>
+      <rect class="box" x="620" y="20" width="100" height="34"/><text class="txt" x="670" y="42">Hive</text>
+      <rect class="box" x="770" y="20" width="120" height="34"/><text class="txt" x="830" y="42">Cassandra</text>
+      <rect class="box" x="950" y="20" width="120" height="34"/><text class="txt" x="1010" y="42">Airflow</text>
+      <line class="line" x1="70" y1="54" x2="70" y2="330"/><line class="line" x1="220" y1="54" x2="220" y2="330"/><line class="line" x1="370" y1="54" x2="370" y2="330"/><line class="line" x1="520" y1="54" x2="520" y2="330"/><line class="line" x1="670" y1="54" x2="670" y2="330"/><line class="line" x1="830" y1="54" x2="830" y2="330"/><line class="line" x1="1010" y1="54" x2="1010" y2="330"/>
+      <line class="msg" x1="70" y1="100" x2="220" y2="100"/><text class="lbl" x="105" y="90">GET weather snapshot</text>
+      <line class="msg" x1="220" y1="145" x2="370" y2="145"/><text class="lbl" x="245" y="135">raw / filtered</text>
+      <line class="msg" x1="370" y1="190" x2="520" y2="190"/><text class="lbl" x="405" y="180">consume topic</text>
+      <line class="msg" x1="520" y1="235" x2="670" y2="235"/><text class="lbl" x="555" y="225">staging y facts</text>
+      <line class="msg" x1="520" y1="280" x2="830" y2="280"/><text class="lbl" x="610" y="270">vehicle_latest_state</text>
+      <line class="msg" x1="1010" y1="315" x2="520" y2="315"/><text class="lbl" x="760" y="305">orquesta micro-batch</text>
+    </svg>
+    """
 
-    overview_left, overview_right = st.columns([1.55, 1])
-    with overview_left:
-        render_html_card(
-            """
-            <div class='tiny-label'>ruta de defensa</div>
-            <h3 style='margin:0.3rem 0 0.7rem 0'>Micro-batch documentado</h3>
-            <p style='color:#9db2d5'>La demo se centra en Docker/local con NiFi, Kafka, HDFS/Hive, Spark, GraphFrames, Cassandra y Airflow, manteniendo streaming real como evidencia tecnica complementaria.</p>
-            <ul>
-              <li>staging y curated persistidos en Hive/HDFS</li>
-              <li>alertas operativas y riesgo de red demostrables</li>
-              <li>estado de vehiculos en Cassandra para baja latencia</li>
-            </ul>
-            """,
-            height=230,
-        )
-    with overview_right:
-        latest_weather = pd.DataFrame(bundle.get("fact_weather_operational", []))
-        if not latest_weather.empty:
-            top = latest_weather.iloc[0]
-            render_html_card(
-                f"""
-                <div class='tiny-label'>resumen ejecutivo</div>
-                <h3 style='margin:0.3rem 0 0.6rem 0'>{top['port_ref']} / {top['route_id']}</h3>
-                <p><strong>Estado:</strong> {top['port_operational_status']}</p>
-                <p><strong>Riesgo:</strong> {top['weather_risk_level']}</p>
-                <p><strong>Retraso estimado:</strong> {top['weather_delay_hours_estimate']} horas</p>
-                <p><strong>Accion:</strong> {top['recommended_action']}</p>
-                """,
-                height=230,
-            )
 
-    c1, c2 = st.columns([1.1, 0.9])
-    with c1:
-        st.subheader("Alertas operativas")
-        st.dataframe(pd.DataFrame(bundle.get("fact_alerts", [])), use_container_width=True, hide_index=True)
-    with c2:
-        st.subheader("Estado operativo por vehiculo")
-        st.dataframe(pd.DataFrame(bundle.get("ships_latest", [])), use_container_width=True, hide_index=True)
+def class_diagram_svg() -> str:
+    return """
+    <svg viewBox="0 0 1120 390" width="100%" height="390" xmlns="http://www.w3.org/2000/svg">
+      <defs><marker id="c" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#0f4c81"/></marker></defs>
+      <style>
+        .box{fill:#ffffff;stroke:#7dd3fc;stroke-width:2;rx:18}
+        .title{fill:#10233f;font:700 14px Inter,sans-serif}
+        .item{fill:#334155;font:12px Inter,sans-serif}
+        .link{stroke:#0f4c81;stroke-width:2.5;fill:none;marker-end:url(#c)}
+      </style>
+      <rect class="box" x="20" y="24" width="220" height="130"/><text class="title" x="40" y="50">Port</text><text class="item" x="40" y="78">+ port_id</text><text class="item" x="40" y="98">+ port_name</text><text class="item" x="40" y="118">+ macro_region</text><text class="item" x="40" y="138">+ lat / lon</text>
+      <rect class="box" x="290" y="24" width="220" height="150"/><text class="title" x="310" y="50">Route</text><text class="item" x="310" y="78">+ route_id</text><text class="item" x="310" y="98">+ origin_port</text><text class="item" x="310" y="118">+ dest_port</text><text class="item" x="310" y="138">+ route_mode</text><text class="item" x="310" y="158">+ sea_hours_estimate</text>
+      <rect class="box" x="560" y="24" width="240" height="150"/><text class="title" x="580" y="50">WeatherEvent</text><text class="item" x="580" y="78">+ event_ts</text><text class="item" x="580" y="98">+ temperature_c</text><text class="item" x="580" y="118">+ humidity_pct</text><text class="item" x="580" y="138">+ wind_speed_kmh</text><text class="item" x="580" y="158">+ severity</text>
+      <rect class="box" x="850" y="24" width="240" height="150"/><text class="title" x="870" y="50">OperationalAlert</text><text class="item" x="870" y="78">+ via_port</text><text class="item" x="870" y="98">+ risk_level</text><text class="item" x="870" y="118">+ stock_status</text><text class="item" x="870" y="138">+ recommendation</text><text class="item" x="870" y="158">+ severity</text>
+      <rect class="box" x="420" y="220" width="280" height="120"/><text class="title" x="440" y="246">VehicleLatestState</text><text class="item" x="440" y="274">+ ship_id</text><text class="item" x="440" y="294">+ route_id</text><text class="item" x="440" y="314">+ dest_port</text><text class="item" x="440" y="334">+ stock_on_hand</text>
+      <path class="link" d="M240 88 C260 88, 270 88, 290 88"/>
+      <path class="link" d="M510 100 C530 100, 540 100, 560 100"/>
+      <path class="link" d="M800 100 C820 100, 830 100, 850 100"/>
+      <path class="link" d="M510 145 C545 145, 520 220, 560 220"/>
+    </svg>
+    """
 
-with tab_diagrams:
-    render_mermaid("Flujo KDD", KDD_MERMAID)
-    render_mermaid("Diagrama de Secuencia", SEQUENCE_MERMAID)
-    render_mermaid("Diagrama de Clases", CLASS_MERMAID)
-    render_mermaid("Casos de Uso", USE_CASE_MERMAID)
 
-with tab_map:
-    st.subheader("Seguimiento de flota y alertas de ruta")
-    ports_df, routes_df, ships_df = build_map_data(bundle)
-    layers = []
-    if not routes_df.empty:
-        layers.append(
-            pdk.Layer(
-                "LineLayer",
-                data=routes_df,
-                get_source_position="[origin_lon, origin_lat]",
-                get_target_position="[dest_lon, dest_lat]",
-                get_color="color",
-                get_width=6,
-                pickable=True,
-            )
-        )
-    if not ports_df.empty:
-        layers.append(
-            pdk.Layer(
-                "ScatterplotLayer",
-                data=ports_df,
-                get_position="[lon, lat]",
-                get_radius=18000,
-                get_fill_color=[15, 118, 110],
-                pickable=True,
-            )
-        )
-    if not ships_df.empty:
-        layers.append(
-            pdk.Layer(
-                "ScatterplotLayer",
-                data=ships_df,
-                get_position="[lon, lat]",
-                get_radius=24000,
-                get_fill_color=[220, 38, 38],
-                pickable=True,
-            )
-        )
-
-    if layers:
-        st.pydeck_chart(
-            pdk.Deck(
-                map_style="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-                initial_view_state=pdk.ViewState(latitude=36.5, longitude=3.0, zoom=2.2, pitch=20),
-                layers=layers,
-                tooltip={"text": "{port_name}{ship_id}{tooltip}"},
-            ),
-            use_container_width=True,
-        )
-
-    col_left, col_right = st.columns([1.15, 0.85])
-    with col_left:
-        st.subheader("Ultimo estado de barcos")
-        st.dataframe(ships_df, use_container_width=True, hide_index=True)
-    with col_right:
-        st.subheader("Clima y operacion")
-        st.dataframe(pd.DataFrame(bundle.get("fact_weather_operational", [])), use_container_width=True, hide_index=True)
-
-    network_left, network_right = st.columns([1.2, 0.8])
-    with network_left:
-        st.subheader("Red logistica activa")
-        st.dataframe(pd.DataFrame(bundle.get("graph_centrality", [])), use_container_width=True, hide_index=True)
-    with network_right:
-        st.subheader("Alertas por puerto")
-        st.dataframe(pd.DataFrame(bundle.get("fact_alerts", [])), use_container_width=True, hide_index=True)
-
-with tab_ops:
-    st.subheader("Estado y control de servicios")
-    for row in service_rows:
-        cols = st.columns([2, 3, 2, 1, 1])
-        cols[0].write(f"**{row['service']}**")
-        cols[1].write(row["status"])
-        cols[2].markdown(
-            f"<span class='status-pill {build_service_badge(row['badge'])}'>{row['badge']}</span>",
-            unsafe_allow_html=True,
-        )
-        if cols[3].button("On", key=f"start_{row['service']}"):
-            st.code(compose_service_action(row["service"] if row["service"] != "airflow" else "airflow-webserver", "start"))
-            st.rerun()
-        if cols[4].button("Off", key=f"stop_{row['service']}"):
-            st.code(compose_service_action(row["service"] if row["service"] != "airflow" else "airflow-webserver", "stop"))
-            st.rerun()
-
-    ops_left, ops_right = st.columns([1, 1])
-    with ops_left:
-        st.subheader("GraphFrames")
-        st.dataframe(pd.DataFrame(bundle.get("graph_centrality", [])), use_container_width=True, hide_index=True)
-    with ops_right:
-        st.subheader("Fact weather operational")
-        st.dataframe(pd.DataFrame(bundle.get("fact_weather_operational", [])), use_container_width=True, hide_index=True)
+def use_case_diagram_svg() -> str:
+    return """
+    <svg viewBox="0 0 1080 370" width="100%" height="370" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        .actor{fill:#ffffff;stroke:#17345c;stroke-width:2}
+        .uc{fill:#ffffff;stroke:#7dd3fc;stroke-width:2}
+        .ucTxt{fill:#10233f;font:13px Inter,sans-serif;text-anchor:middle;dominant-baseline:middle}
+        .lab{fill:#17345c;font:13px Inter,sans-serif}
+        .line{stroke:#0f4c81;stroke-width:2}
+      </style>
+      <circle class="actor" cx="100" cy="70" r="22"/><line class="actor" x1="100" y1="92" x2="100" y2="145"/><line class="actor" x1="72" y1="112" x2="128" y2="112"/><line class="actor" x1="100" y1="145" x2="76" y2="182"/><line class="actor" x1="100" y1="145" x2="124" y2="182"/><text class="lab" x="35" y="220">Profesor / Tribunal</text>
+      <ellipse class="uc" cx="410" cy="60" rx="170" ry="30"/><text class="ucTxt" x="410" y="60">Ver arquitectura y flujo KDD</text>
+      <ellipse class="uc" cx="410" cy="120" rx="170" ry="30"/><text class="ucTxt" x="410" y="120">Ver estado de servicios</text>
+      <ellipse class="uc" cx="410" cy="180" rx="170" ry="30"/><text class="ucTxt" x="410" y="180">Ver mapa de barcos y alertas</text>
+      <ellipse class="uc" cx="760" cy="90" rx="170" ry="30"/><text class="ucTxt" x="760" y="90">Consultar facts y Cassandra</text>
+      <ellipse class="uc" cx="760" cy="170" rx="170" ry="30"/><text class="ucTxt" x="760" y="170">Arrancar / parar servicios</text>
+      <ellipse class="uc" cx="760" cy="250" rx="170" ry="30"/><text class="ucTxt" x="760" y="250">Explicar grafos y nodos criticos</text>
+      <line class="line" x1="128" y1="112" x2="240" y2="60"/>
+      <line class="line" x1="128" y1="112" x2="240" y2="120"/>
+      <line class="line" x1="128" y1="112" x2="240" y2="180"/>
+      <line class="line" x1="580" y1="90" x2="590" y2="90"/>
+      <line class="line" x1="580" y1="120" x2="590" y2="170"/>
+      <line class="line" x1="580" y1="180" x2="590" y2="250"/>
+    </svg>
+    """

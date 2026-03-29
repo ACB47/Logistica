@@ -313,6 +313,34 @@ Salida:
 - Ejemplos de alertas generadas.
 - Registro en Hive `fact_alerts`.
 
+### 7.2 Caso de uso extendido: barco vs aereo + camion
+
+Para reforzar la fase de interpretación y acción, el proyecto incorpora un caso de uso ampliado centrado en la importación desde Shanghai a puertos españoles con destino final Valladolid.
+
+El sistema compara dos alternativas logísticas:
+
+- continuación marítima del barco hasta el puerto de destino y posterior distribución
+- recuperación por `aéreo + camión` hasta Valladolid
+
+Factores de decisión:
+
+- posición GPS actual del barco
+- ETA restante marítima
+- retraso meteorológico y operativo
+- stock disponible y punto de reorden
+- ETA aérea hasta Madrid, Barcelona o Valencia
+- tramo terrestre por camión hasta Valladolid
+- coste total del corredor alternativo
+- horas ganadas frente al barco
+
+Tabla objetivo:
+
+- `logistica.fact_air_recovery_options`
+
+Resultado esperado:
+- recomendación explicable `MARITIMO` o `AEREO_CAMION`
+- estimación de ahorro de tiempo y coste total
+
 ---
 
 ## 8. Orquestación (KDD – Interpretación/Acción): Airflow
@@ -369,6 +397,7 @@ Incluye:
 - resumen KDD y estado de cumplimiento de la rubrica
 - estado en vivo de servicios Docker con botones `On/Off`
 - mapa de barcos con alertas de ruta
+- recomendaciones de recuperación `barco vs aereo+camion`
 - tablas curadas relevantes para la defensa
 - diagramas Mermaid: flujo, secuencia, clases y casos de uso
 
