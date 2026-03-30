@@ -317,6 +317,7 @@ def run_script(script: str) -> str:
 
 @st.cache_data(ttl=60)
 def get_dashboard_bundle() -> dict:
+    output_file = ROOT / "jobs" / "dashboard_bundle_output.json"
     command = DOCKER_COMPOSE + [
         "exec",
         "-T",
@@ -325,14 +326,13 @@ def get_dashboard_bundle() -> dict:
         "/home/jovyan/jobs/spark/99_dashboard_bundle.py",
     ]
     result = run_command(command, timeout=600)
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr or "No se pudo consultar el bundle del dashboard")
+    if result.returncode != 0 and not output_file.exists():
+        raise RuntimeError(result.stderr or result.stdout or "No se pudo consultar el bundle del dashboard")
 
-    lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    json_line = next((line for line in reversed(lines) if line.startswith("{") and line.endswith("}")), None)
-    if not json_line:
-        raise RuntimeError("No se encontro salida JSON valida del bundle del dashboard")
-    return json.loads(json_line)
+    if not output_file.exists():
+        raise RuntimeError("No se genero el archivo dashboard_bundle_output.json")
+
+    return json.loads(output_file.read_text(encoding="utf-8"))
 
 
 def build_map_data(bundle: dict) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -368,6 +368,56 @@ def summarize_risk(bundle: dict) -> tuple[int, int, float]:
     medium = int((alerts["severity"] >= 2).sum()) if not alerts.empty else 0
     avg_delay = float(weather["weather_delay_hours_estimate"].mean()) if not weather.empty else 0.0
     return critical, medium, avg_delay
+
+
+def build_control_tower_kpis(bundle: dict) -> dict[str, float | int | str]:
+    stock = pd.DataFrame(bundle.get("stock_valladolid", []))
+    ships = pd.DataFrame(bundle.get("ships_latest", []))
+    orders = pd.DataFrame(bundle.get("customer_orders_douai", []))
+    air = pd.DataFrame(bundle.get("fact_air_recovery_options", []))
+
+    if not stock.empty:
+        order_totals = (
+            orders.groupby("article_ref", as_index=False)["ordered_pieces"].sum()
+            if not orders.empty
+            else pd.DataFrame(columns=["article_ref", "ordered_pieces"])
+        )
+        if not order_totals.empty:
+            stock = stock.merge(order_totals, on="article_ref", how="left")
+        else:
+            stock["ordered_pieces"] = 0
+        stock["ordered_pieces"] = stock["ordered_pieces"].fillna(0)
+        stock["available_after_orders"] = stock["total_stock_pieces"] - stock["ordered_pieces"]
+        stock["doh"] = (stock["available_after_orders"] / stock["daily_consumption_avg"]).round(1)
+        doh = round(float(stock["doh"].mean()), 1)
+        security_level = round(float((stock["safety_stock_min"] / stock["total_stock_pieces"]).mean() * 100), 1)
+        critical_refs = int((stock["available_after_orders"] <= stock["safety_stock_min"]).sum())
+    else:
+        doh = 0.0
+        security_level = 0.0
+        critical_refs = 0
+
+    eta_avg = round(float(ships["eta_hours_estimate"].mean()), 1) if not ships.empty else 0.0
+    otif = 100.0
+    if not orders.empty and "order_status" in orders.columns:
+        otif = round(float((orders["order_status"] == "sea_committed").mean() * 100), 1)
+
+    if not air.empty and "time_saved_hours" in air.columns:
+        avg_time_saved = round(float(air["time_saved_hours"].mean()), 1)
+        best_mode = str(air.iloc[0].get("recommended_mode", "N/A"))
+    else:
+        avg_time_saved = 0.0
+        best_mode = "N/A"
+
+    return {
+        "doh": doh,
+        "otif": otif,
+        "eta_avg": eta_avg,
+        "security_level": security_level,
+        "critical_refs": critical_refs,
+        "avg_time_saved": avg_time_saved,
+        "best_mode": best_mode,
+    }
 
 
 def build_service_badge(badge: str) -> str:
@@ -492,6 +542,7 @@ ok_count = sum(1 for row in service_rows if row["badge"] == "OK")
 nok_count = sum(1 for row in service_rows if row["badge"] == "NOK")
 off_count = sum(1 for row in service_rows if row["badge"] == "OFF")
 critical_alerts, medium_alerts, avg_delay = summarize_risk(bundle)
+kpis = build_control_tower_kpis(bundle)
 
 hero_left, hero_right = st.columns([1.7, 0.9])
 with hero_left:
@@ -527,99 +578,79 @@ metric_cols = st.columns(6)
 with metric_cols[0]:
     render_card("Flota monitorizada", str(len(bundle.get("ships_latest", []))), "Ultimo estado por vehiculo")
 with metric_cols[1]:
-    render_card("Rutas bajo observacion", str(len(bundle.get("fact_alerts", []))), "Alertas operativas")
+    render_card("DOH Valladolid", f"{kpis['doh']}", "Cobertura media de stock")
 with metric_cols[2]:
-    render_card("Riesgo meteo alto/medio", str(medium_alerts), "Fact weather operational")
+    render_card("OTIF estimado", f"{kpis['otif']}%", "Pedidos Douai comprometidos")
 with metric_cols[3]:
-    render_card("Retraso medio actual", f"{avg_delay:.1f}h", "Impacto logístico")
+    render_card("ETA medio barcos", f"{kpis['eta_avg']}h", "Llegada estimada a España")
 with metric_cols[4]:
-    render_card("Servicios NOK", str(nok_count), "Contenedores con incidencia")
+    render_card("Stock seguridad", f"{kpis['security_level']}%", "Nivel medio de colchón")
 with metric_cols[5]:
-    render_card("Vehiculos impactados", str(critical_alerts), "Alertas severidad >= 4")
+    render_card("Referencias críticas", str(kpis['critical_refs']), "Riesgo de rotura de stock")
 
-tab_overview, tab_diagrams, tab_map, tab_stock, tab_ops = st.tabs([
-    "Resumen KDD",
-    "Diagramas",
-    "Mapa y Alertas",
-    "Stock Valladolid",
-    "Servicios",
+tab_exec, tab_tower, tab_arch, tab_ingesta, tab_spark, tab_graph, tab_persist, tab_airflow, tab_evidence = st.tabs([
+    "1. Resumen Ejecutivo",
+    "2. Control Tower Valladolid",
+    "3. Arquitectura en Vivo",
+    "4. KDD Fase I - Ingesta",
+    "5. KDD Fase II - Spark",
+    "6. GraphFrames - Red logística",
+    "7. Persistencia",
+    "8. Orquestación",
+    "9. Evidencias KDD",
 ])
 
-with tab_overview:
-    left, right = st.columns([1.2, 0.8])
+with tab_exec:
+    left, right = st.columns([1.1, 0.9])
     with left:
+        st.subheader("Gestión por excepción")
+        render_panel(
+            "Valladolid bajo vigilancia",
+            "control tower",
+            f"<strong>DOH medio:</strong> {kpis['doh']} dias<br/><strong>ETA medio barcos:</strong> {kpis['eta_avg']} horas<br/><strong>Referencias críticas:</strong> {kpis['critical_refs']}<br/><strong>Modo mejor valorado:</strong> {kpis['best_mode']}",
+            height=220,
+        )
         st.subheader("Alertas operativas")
         st.dataframe(pd.DataFrame(bundle.get("fact_alerts", [])), use_container_width=True, hide_index=True)
-        st.subheader("Fact weather operational")
-        st.dataframe(pd.DataFrame(bundle.get("fact_weather_operational", [])), use_container_width=True, hide_index=True)
     with right:
-        st.subheader("Contingencia aerea")
+        st.subheader("Opciones de contingencia")
         st.dataframe(pd.DataFrame(bundle.get("fact_air_recovery_options", [])), use_container_width=True, hide_index=True)
-        st.subheader("Estado operativo por vehiculo")
-        st.dataframe(pd.DataFrame(bundle.get("ships_latest", [])), use_container_width=True, hide_index=True)
-
-with tab_diagrams:
-    render_diagram("Flujo KDD", "pipeline general", flow_diagram_svg())
-    render_diagram("Diagrama de Secuencia", "interaccion entre componentes", sequence_diagram_svg())
-    render_diagram("Diagrama de Clases", "modelo conceptual", class_diagram_svg())
-    render_diagram("Casos de Uso", "escenarios de defensa", use_case_diagram_svg())
-
-with tab_map:
-    st.subheader("Seguimiento de flota y alertas de ruta")
-    ports_df, routes_df, ships_df, alerts_df = build_map_data(bundle)
-    layers = []
-    if not routes_df.empty:
-        layers.append(pdk.Layer("LineLayer", data=routes_df, get_source_position="[origin_lon, origin_lat]", get_target_position="[dest_lon, dest_lat]", get_color="color", get_width=6, pickable=True))
-    if not ports_df.empty:
-        layers.append(pdk.Layer("ScatterplotLayer", data=ports_df, get_position="[lon, lat]", get_radius=18000, get_fill_color=[31, 119, 180], pickable=True))
-    if not ships_df.empty:
-        layers.append(pdk.Layer("ScatterplotLayer", data=ships_df, get_position="[lon, lat]", get_radius=24000, get_fill_color=[220, 38, 38], pickable=True))
-    if layers:
-        st.pydeck_chart(
-            pdk.Deck(
-                map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-                initial_view_state=pdk.ViewState(latitude=36.5, longitude=3.0, zoom=2.3, pitch=20),
-                layers=layers,
-            ),
-            use_container_width=True,
+        st.subheader("KPIs clave")
+        summary_df = pd.DataFrame(
+            [
+                ["Coste logístico por contingencia", f"{kpis['avg_time_saved']}h ahorro medio"],
+                ["Riesgo meteo alto/medio", str(medium_alerts)],
+                ["Servicios NOK", str(nok_count)],
+                ["Alertas críticas", str(critical_alerts)],
+            ],
+            columns=["Indicador", "Valor"],
         )
-    mleft, mright = st.columns([1.2, 0.8])
-    with mleft:
-        st.subheader("Ultimo estado de barcos")
-        st.dataframe(ships_df, use_container_width=True, hide_index=True)
-        st.subheader("Red logistica activa")
-        st.dataframe(pd.DataFrame(bundle.get("graph_centrality", [])), use_container_width=True, hide_index=True)
-    with mright:
-        st.subheader("Alertas por puerto")
-        st.dataframe(alerts_df, use_container_width=True, hide_index=True)
-        st.subheader("Recuperacion aerea")
-        st.dataframe(pd.DataFrame(bundle.get("fact_air_recovery_options", [])), use_container_width=True, hide_index=True)
+        summary_df["Valor"] = summary_df["Valor"].astype(str)
+        st.dataframe(summary_df, use_container_width=True, hide_index=True)
 
-with tab_stock:
-    st.subheader("Stock de almacen en Valladolid")
-    stock_df = build_stock_table(bundle)
-    if stock_df.empty:
-        st.info("Todavia no hay datos de stock preparados para Valladolid.")
-    else:
-        st.dataframe(stock_df, use_container_width=True, hide_index=True)
-
-    col_left, col_right = st.columns([1.05, 0.95])
-    with col_left:
-        st.subheader("Pedidos del cliente Douai")
+with tab_tower:
+    stock_left, stock_right = st.columns([1.1, 0.9])
+    with stock_left:
+        st.subheader("Stock Valladolid")
+        stock_df = build_stock_table(bundle)
+        if stock_df.empty:
+            st.info("Todavia no hay datos de stock preparados para Valladolid.")
+        else:
+            st.dataframe(stock_df, use_container_width=True, hide_index=True)
+        st.subheader("Pedidos cliente Douai")
         st.dataframe(pd.DataFrame(bundle.get("customer_orders_douai", [])), use_container_width=True, hide_index=True)
-    with col_right:
-        st.subheader("Recuperacion multimodal")
-        st.dataframe(pd.DataFrame(bundle.get("fact_air_recovery_options", [])), use_container_width=True, hide_index=True)
+    with stock_right:
+        st.subheader("Flota y ETA")
+        st.dataframe(pd.DataFrame(bundle.get("ships_latest", [])), use_container_width=True, hide_index=True)
+        st.subheader("Gantt por semanas industriales")
+        gantt_fig = build_gantt(bundle)
+        if gantt_fig is None:
+            st.info("Todavia no hay tareas de planificacion para mostrar en el Gantt.")
+        else:
+            st.plotly_chart(gantt_fig, use_container_width=True)
 
-    st.subheader("Diagrama de Gantt por semanas industriales")
-    gantt_fig = build_gantt(bundle)
-    if gantt_fig is None:
-        st.info("Todavia no hay tareas de planificacion para mostrar en el Gantt.")
-    else:
-        st.plotly_chart(gantt_fig, use_container_width=True)
-
-with tab_ops:
-    st.subheader("Estado y control de servicios")
+with tab_arch:
+    st.subheader("Arquitectura en vivo")
     for row in service_rows:
         cols = st.columns([2, 3, 2, 1, 1])
         cols[0].write(f"**{row['service']}**")
@@ -632,10 +663,96 @@ with tab_ops:
         if cols[4].button("Off", key=f"stop_{row['service']}"):
             st.code(compose_service_action(service_name, "stop"))
             st.rerun()
-    oleft, oright = st.columns(2)
-    with oleft:
-        st.subheader("GraphFrames")
-        st.dataframe(pd.DataFrame(bundle.get("graph_centrality", [])), use_container_width=True, hide_index=True)
-    with oright:
-        st.subheader("Decision barco vs aereo")
+
+with tab_ingesta:
+    st.subheader("NiFi + Kafka")
+    ing_left, ing_right = st.columns([1, 1])
+    with ing_left:
+        render_panel(
+            "Ingesta robusta",
+            "fase I",
+            "Open-Meteo entra por NiFi y se publica a Kafka en raw y filtered. La defensa se apoya en datos crudos, filtrados y evidencia exportable del flujo.",
+            height=200,
+        )
+        kafka_topics = pd.DataFrame(
+            [
+                ["datos_crudos", "raw"],
+                ["datos_filtrados", "filtered"],
+                ["datos_filtrados_ok", "filtered demo"],
+                ["alertas_globales", "alerts"],
+            ],
+            columns=["Topic", "Uso"],
+        )
+        st.dataframe(kafka_topics, use_container_width=True, hide_index=True)
+    with ing_right:
+        st.subheader("Mapa y alertas de ruta")
+        ports_df, routes_df, ships_df, alerts_df = build_map_data(bundle)
+        layers = []
+        if not routes_df.empty:
+            layers.append(pdk.Layer("LineLayer", data=routes_df, get_source_position="[origin_lon, origin_lat]", get_target_position="[dest_lon, dest_lat]", get_color="color", get_width=6, pickable=True))
+        if not ports_df.empty:
+            layers.append(pdk.Layer("ScatterplotLayer", data=ports_df, get_position="[lon, lat]", get_radius=18000, get_fill_color=[31, 119, 180], pickable=True))
+        if not ships_df.empty:
+            layers.append(pdk.Layer("ScatterplotLayer", data=ships_df, get_position="[lon, lat]", get_radius=24000, get_fill_color=[220, 38, 38], pickable=True))
+        if layers:
+            st.pydeck_chart(
+                pdk.Deck(
+                    map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+                    initial_view_state=pdk.ViewState(latitude=36.5, longitude=3.0, zoom=2.3, pitch=20),
+                    layers=layers,
+                ),
+                use_container_width=True,
+            )
+
+with tab_spark:
+    st.subheader("Spark SQL + Streaming")
+    sp_left, sp_right = st.columns([1, 1])
+    with sp_left:
+        st.dataframe(pd.DataFrame(bundle.get("fact_weather_operational", [])), use_container_width=True, hide_index=True)
+    with sp_right:
         st.dataframe(pd.DataFrame(bundle.get("fact_air_recovery_options", [])), use_container_width=True, hide_index=True)
+
+with tab_graph:
+    st.subheader("GraphFrames y criticidad")
+    st.dataframe(pd.DataFrame(bundle.get("graph_centrality", [])), use_container_width=True, hide_index=True)
+
+with tab_persist:
+    st.subheader("Persistencia Hive vs Cassandra")
+    p_left, p_right = st.columns(2)
+    with p_left:
+        hive_tables = pd.DataFrame(
+            [
+                ["fact_weather_operational", "Analítica operativa"],
+                ["fact_air_recovery_options", "Contingencia"],
+                ["fact_alerts", "Alertas"],
+                ["fact_graph_centrality", "GraphFrames"],
+                ["fact_article_gantt", "Planificación"],
+            ],
+            columns=["Tabla Hive", "Uso"],
+        )
+        st.dataframe(hive_tables, use_container_width=True, hide_index=True)
+    with p_right:
+        st.subheader("Cassandra")
+        cass_df = pd.DataFrame(bundle.get("ships_latest", []))
+        st.dataframe(cass_df[[c for c in cass_df.columns if c in ["ship_id", "route_id", "dest_port", "stock_on_hand", "eta_hours_estimate"]]], use_container_width=True, hide_index=True)
+
+with tab_airflow:
+    st.subheader("Airflow y orquestación")
+    airflow_df = pd.DataFrame(
+        [
+            ["logistica_kdd_microbatch", "15 min", "staging + facts + Cassandra"],
+            ["logistica_kdd_monthly_retrain", "mensual", "grafo + limpieza HDFS"],
+        ],
+        columns=["DAG", "Frecuencia", "Función"],
+    )
+    st.dataframe(airflow_df, use_container_width=True, hide_index=True)
+
+with tab_evidence:
+    st.subheader("Evidencias KDD")
+    render_diagram("Flujo KDD", "pipeline general", flow_diagram_svg())
+    render_diagram("Diagrama de Secuencia", "interaccion entre componentes", sequence_diagram_svg())
+    render_diagram("Diagrama de Clases", "modelo conceptual", class_diagram_svg())
+    render_diagram("Casos de Uso", "escenarios de defensa", use_case_diagram_svg())
+    stock_df = build_stock_table(bundle)
+    if not stock_df.empty:
+        st.dataframe(stock_df, use_container_width=True, hide_index=True)

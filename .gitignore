@@ -10,3 +10,4 @@ airflow/airflow-webserver.pid
 airflow/standalone_admin_password.txt
 airflow/logs/
 airflow/webserver_config.py
+jobs/dashboard_bundle_output.json

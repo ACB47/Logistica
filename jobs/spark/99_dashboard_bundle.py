@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 from datetime import datetime
+from pathlib import Path
 
 from pyspark.sql import SparkSession, Window
 from pyspark.sql.functions import col, expr, row_number
@@ -17,6 +19,8 @@ def rows_to_dicts(dataframe, limit: int | None = None) -> list[dict]:
         for key, value in row.asDict().items():
             if isinstance(value, datetime):
                 record[key] = value.isoformat()
+            elif isinstance(value, Decimal):
+                record[key] = float(value)
             else:
                 record[key] = value
         rows.append(record)
@@ -120,7 +124,9 @@ def main() -> None:
     except Exception as exc:  # pragma: no cover
         errors.append(f"fact_graph_centrality: {exc}")
 
-    print(json.dumps(payload, ensure_ascii=True))
+    output_path = Path("/home/jovyan/jobs/dashboard_bundle_output.json")
+    output_path.write_text(json.dumps(payload, ensure_ascii=True), encoding="utf-8")
+    print(f"OK - dashboard bundle escrito en {output_path}")
     spark.stop()
 
 
