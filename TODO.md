@@ -96,6 +96,7 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [x] Revisar el modelo Cassandra actual para que responda a preguntas reales de negocio y no solo a metricas agregadas.
 - [x] Validar escrituras reales en Cassandra desde Spark o desde un proceso dedicado.
 - [x] Preparar consultas de demostracion en Cassandra para la defensa.
+- [x] Modelar una fact table de contingencia `barco vs aereo+camion` con ETA, coste y riesgo de stock.
 
 ### ML, reglas y accion operativa
 - [x] Hay scoring y recomendaciones en `jobs/spark/03_score_and_alert.py`.
@@ -108,6 +109,7 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [ ] Asegurar que el modelo o scoring final tenga entradas, salida y criterio de evaluacion claros.
 - [ ] Integrar el envio de alertas email con configuracion segura por `.env` o variables de entorno.
 - [ ] Probar y evidenciar al menos una alerta real generada de punta a punta.
+- [x] Incorporar un caso de uso avanzado de contingencia con recomendacion explicable para acelerar envios sin romper stock.
 
 ## 5. Fase IV - Orquestacion con Airflow
 - [x] Existe `airflow/dags/logistica_kdd_dag.py`.
@@ -151,10 +153,12 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
   - [x] NiFi canvas.
   - [x] Hive tablas base (`stg_weather_open_meteo`, `dim_ports_routes_weather`, `fact_weather_operational`).
   - [x] Hive alertas (`fact_alerts`).
+  - [ ] Hive contingencia (`fact_air_recovery_options`).
   - [x] Cassandra consultas.
   - [x] HDFS curated.
   - [x] GraphFrames resultados.
   - [x] Airflow DAG.
+  - [ ] Dashboard final con stock Valladolid, pedidos Douai y Gantt.
 - [ ] Explicar claramente que parte esta implementada de verdad y que parte es simulada.
 - [ ] Redactar conclusiones, limitaciones y mejoras futuras.
 
@@ -170,6 +174,7 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [x] Resolver incoherencias entre Docker, scripts standalone y cluster de 3 VMs dejando Docker/local como ruta oficial.
 - [ ] Confirmar que todos los comandos del README funcionan o actualizarlos.
 - [ ] Dejar una checklist de entrega final marcada con fecha.
+- [ ] Validar visualmente el dashboard final y que la pestaña de stock/Gantt se ve correctamente.
 
 ## 11. Checklist de entrega final
 - [x] Stack final levantado sin errores.
@@ -181,5 +186,6 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [x] DAG Airflow ejecutado con exito y capturado.
 - [x] Al menos una alerta operativa generada y registrada.
 - [x] Rebuild tecnico reproducible tras reinicio validado.
+- [ ] Dashboard final ensayado y legible en exposicion.
 - [ ] Memoria completa con capturas.
 - [ ] Demo final ensayada.
