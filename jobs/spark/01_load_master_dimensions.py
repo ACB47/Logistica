@@ -24,6 +24,33 @@ SKUS = [
     ("SKU-SEA-001", "Carga maritima general", "standard", "contenedor 40ft", "active"),
 ]
 
+ARTICLES_VALLADOLID = [
+    ("1000001023", "Modulo ABS delantero", "componentes coche", 18, 42, 756, 420, 2, "Valladolid"),
+    ("1000002087", "Centralita motor ECU", "electronica coche", 6, 11, 66, 90, 4, "Valladolid"),
+    ("1000003154", "Juego de sensores radar", "asistencia conduccion", 10, 16, 160, 120, 2, "Valladolid"),
+    ("1000004278", "Bomba de combustible", "powertrain", 12, 35, 420, 240, 3, "Valladolid"),
+]
+
+CUSTOMER_ORDERS_DOUAI = [
+    ("ORD-DOU-001", "1000001023", "Douai", "FR", "IW14", "2026-04-01", "2026-04-08", 9, 378, "sea_committed"),
+    ("ORD-DOU-002", "1000002087", "Douai", "FR", "IW14", "2026-04-02", "2026-04-05", 8, 48, "risk_stock"),
+    ("ORD-DOU-003", "1000003154", "Douai", "FR", "IW15", "2026-04-06", "2026-04-11", 7, 112, "sea_committed"),
+    ("ORD-DOU-004", "1000004278", "Douai", "FR", "IW15", "2026-04-07", "2026-04-12", 12, 144, "sea_committed"),
+]
+
+ARTICLE_GANTT = [
+    ("1000001023", "Recepcion maritima", "2026-03-31", "2026-04-07", "IW14", "sea"),
+    ("1000001023", "Preparacion almacen", "2026-04-07", "2026-04-08", "IW14", "warehouse"),
+    ("1000001023", "Envio a cliente Douai", "2026-04-08", "2026-04-10", "IW14", "truck"),
+    ("1000002087", "Alternativa aerea Shanghai-Madrid", "2026-04-01", "2026-04-02", "IW14", "air"),
+    ("1000002087", "Camion Madrid-Valladolid", "2026-04-02", "2026-04-03", "IW14", "truck"),
+    ("1000002087", "Expedicion Valladolid-Douai", "2026-04-03", "2026-04-05", "IW14", "truck"),
+    ("1000003154", "Recepcion maritima", "2026-04-05", "2026-04-10", "IW15", "sea"),
+    ("1000003154", "Entrega cliente Douai", "2026-04-10", "2026-04-11", "IW15", "truck"),
+    ("1000004278", "Recepcion maritima", "2026-04-06", "2026-04-11", "IW15", "sea"),
+    ("1000004278", "Entrega cliente Douai", "2026-04-11", "2026-04-12", "IW15", "truck"),
+]
+
 AIRPORTS = [
     ("AIR-PVG", "Shanghai Pudong", "Shanghai", "CN", 31.1443, 121.8083, "origin_air_hub"),
     ("AIR-MAD", "Adolfo Suarez Madrid-Barajas", "Madrid", "ES", 40.4893, -3.5676, "destination_airport"),
@@ -82,6 +109,39 @@ def main() -> None:
             "truck_km_to_warehouse",
         ],
     )
+    dim_articles_valladolid = spark.createDataFrame(
+        ARTICLES_VALLADOLID,
+        [
+            "article_ref",
+            "article_name",
+            "article_family",
+            "pieces_per_pack",
+            "daily_consumption_avg",
+            "total_stock_pieces",
+            "safety_stock_min",
+            "total_stock_packs",
+            "warehouse_name",
+        ],
+    )
+    fact_customer_orders_douai = spark.createDataFrame(
+        CUSTOMER_ORDERS_DOUAI,
+        [
+            "order_id",
+            "article_ref",
+            "customer_city",
+            "customer_country",
+            "industrial_week",
+            "planned_dispatch_date",
+            "planned_delivery_date",
+            "ordered_packs",
+            "ordered_pieces",
+            "order_status",
+        ],
+    )
+    fact_article_gantt = spark.createDataFrame(
+        ARTICLE_GANTT,
+        ["article_ref", "task_name", "start_date", "end_date", "industrial_week", "transport_mode"],
+    )
 
     targets = [
         (dim_ports, "logistica.dim_ports", "hdfs://namenode:8020/hadoop/logistica/master/dim_ports"),
@@ -90,6 +150,9 @@ def main() -> None:
         (dim_skus, "logistica.dim_skus", "hdfs://namenode:8020/hadoop/logistica/master/dim_skus"),
         (dim_airports, "logistica.dim_airports", "hdfs://namenode:8020/hadoop/logistica/master/dim_airports"),
         (dim_air_recovery, "logistica.dim_air_recovery", "hdfs://namenode:8020/hadoop/logistica/master/dim_air_recovery"),
+        (dim_articles_valladolid, "logistica.dim_articles_valladolid", "hdfs://namenode:8020/hadoop/logistica/master/dim_articles_valladolid"),
+        (fact_customer_orders_douai, "logistica.fact_customer_orders_douai", "hdfs://namenode:8020/hadoop/logistica/curated/fact_customer_orders_douai"),
+        (fact_article_gantt, "logistica.fact_article_gantt", "hdfs://namenode:8020/hadoop/logistica/curated/fact_article_gantt"),
     ]
 
     for _, table_name, _ in targets:

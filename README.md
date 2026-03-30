@@ -153,6 +153,9 @@ Open-Meteo -> NiFi -> Kafka (datos_crudos / datos_filtrados)
 | `logistica.fact_graph_centrality` | Hive fact | criticidad de nodos |
 | `logistica.fact_alerts` | Hive fact | alertas operativas |
 | `logistica.vehicle_latest_state` | Cassandra | último estado por vehículo |
+| `logistica.dim_articles_valladolid` | Hive dimensión | stock detallado por artículo en Valladolid |
+| `logistica.fact_customer_orders_douai` | Hive fact | pedidos del cliente de Douai por semana industrial |
+| `logistica.fact_article_gantt` | Hive fact | planificación por artículo y modo logístico |
 
 ## Dashboard
 
@@ -165,6 +168,10 @@ Open-Meteo -> NiFi -> Kafka (datos_crudos / datos_filtrados)
   - alertas operativas por ruta/puerto
   - tablas de `fact_alerts`, `fact_weather_operational`, `fact_graph_centrality` y `vehicle_latest_state`
   - diagramas de flujo, secuencia, clases y casos de uso
+  - comparativa `barco vs aereo+camion` con ETA, coste total y riesgo de stock
+  - panel de stock de Valladolid por referencia de artículo
+  - pedidos del cliente de Douai
+  - Gantt por semanas industriales
 
 - Ejecución:
 
@@ -216,6 +223,7 @@ El caso de uso principal se amplía con una capa de decisión logística orienta
 
 La comparación contempla:
 
+- ETA estimada del barco (Estimated Time Arrival)
 - tiempo restante del barco hasta puerto y almacén
 - retraso meteorológico y portuario
 - tiempo de vuelo hasta aeropuertos españoles
@@ -232,6 +240,16 @@ Recomendación final esperada:
 
 - `MARITIMO` si la ruta sigue siendo viable y más barata
 - `AEREO_CAMION` si la alternativa aérea evita rotura de stock y mejora el ETA con un coste justificable
+
+El panel de barcos del dashboard también incorpora `ETA` por barco para visualizar de forma directa si la llegada prevista compromete el stock.
+
+Ejemplo ya generado en tabla:
+
+- `ship-001 | Algeciras | MARITIMO | ROTURA_INMINENTE | 411.5h barco | 25.8h aereo+camion | ahorro 385.7h | 17672.0 EUR`
+
+## Nota operativa sobre Hive/Spark
+
+El metastore Hive embebido del contenedor `spark` funciona correctamente, pero las ejecuciones `spark-submit` y las consultas `spark-sql` que usen Hive deben lanzarse **de forma secuencial**, nunca en paralelo. Si se solapan, Derby puede bloquear el metastore temporalmente.
 
 ## Pendiente para cierre completo de entrega
 

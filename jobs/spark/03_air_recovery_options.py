@@ -3,6 +3,7 @@ from __future__ import annotations
 from pyspark.sql import SparkSession, Window
 from pyspark.sql.functions import (
     col,
+    coalesce,
     current_timestamp,
     lit,
     round as sql_round,
@@ -94,8 +95,8 @@ def main() -> None:
             sql_round(
                 lit(EARTH_RADIUS_KM)
                 * sqrt(
-                    ((col("dest_lat") - col("lat")) * (col("dest_lat") - col("lat")))
-                    + ((col("dest_lon") - col("lon")) * (col("dest_lon") - col("lon")))
+                    ((col("dest_lat") - col("s.lat")) * (col("dest_lat") - col("s.lat")))
+                    + ((col("dest_lon") - col("s.lon")) * (col("dest_lon") - col("s.lon")))
                 ),
                 2,
             ),
@@ -153,7 +154,7 @@ def main() -> None:
         .withColumn(
             "ia_recommendation",
             when(
-                (col("severity") >= lit(4))
+                (coalesce(col("severity"), col("alert_severity")) >= lit(4))
                 | (col("weather_risk_level") == lit("ALTO"))
                 | (col("stock_break_risk") != lit("COBERTURA_OK")),
                 lit("evaluar_aereo_urgente"),
@@ -189,20 +190,20 @@ def main() -> None:
         .drop("row_num")
         .select(
             current_timestamp().alias("decision_ts"),
-            "ship_id",
-            "route_id",
-            "origin_port",
-            "dest_port",
+            col("s.ship_id").alias("ship_id"),
+            col("s.route_id").alias("route_id"),
+            col("s.origin_port").alias("origin_port"),
+            col("s.dest_port").alias("dest_port"),
             col("warehouse_name").alias("warehouse"),
             col("air_recovery_id").alias("air_option_id"),
             col("dest_city").alias("air_dest_city"),
             "weather_risk_level",
             "port_operational_status",
-            col("severity").alias("weather_severity"),
+            coalesce(col("severity"), col("alert_severity")).alias("weather_severity"),
             "graph_risk_level",
             "graph_recommendation",
-            "stock_on_hand",
-            "reorder_point",
+            col("s.stock_on_hand").alias("stock_on_hand"),
+            col("s.reorder_point").alias("reorder_point"),
             "hours_until_stock_break",
             "ship_remaining_hours",
             "air_total_eta_hours",

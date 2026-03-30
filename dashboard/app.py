@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 
 import pandas as pd
+import plotly.express as px
 import pydeck as pdk
 import streamlit as st
 import streamlit.components.v1 as components
@@ -273,3 +274,368 @@ def use_case_diagram_svg() -> str:
       <line class="line" x1="580" y1="180" x2="590" y2="250"/>
     </svg>
     """
+
+
+@st.cache_data(ttl=15)
+def get_service_status() -> list[dict[str, str]]:
+    result = run_command(["docker", "ps", "-a", "--format", "{{.Names}}\t{{.Status}}"])
+    status_by_name: dict[str, str] = {}
+    for line in result.stdout.splitlines():
+        if "\t" in line:
+            name, status = line.split("\t", 1)
+            status_by_name[name] = status
+
+    rows = []
+    for service, container_name in SERVICE_MAP.items():
+        raw_status = status_by_name.get(container_name, "Not created")
+        if "healthy" in raw_status.lower() or raw_status.startswith("Up"):
+            badge = "OK"
+        elif "Restarting" in raw_status or "Exited" in raw_status:
+            badge = "NOK"
+        elif raw_status == "Not created":
+            badge = "OFF"
+        else:
+            badge = "BOOT"
+        rows.append({"service": service, "container": container_name, "status": raw_status, "badge": badge})
+    return rows
+
+
+def compose_service_action(service: str, action: str) -> str:
+    if action == "start":
+        result = run_command(DOCKER_COMPOSE + ["up", "-d", service], timeout=600)
+    else:
+        result = run_command(DOCKER_COMPOSE + ["stop", service], timeout=300)
+    st.cache_data.clear()
+    return result.stdout or result.stderr or f"{action} {service} ejecutado"
+
+
+def run_script(script: str) -> str:
+    result = run_command(["bash", script], timeout=1200)
+    st.cache_data.clear()
+    return result.stdout or result.stderr
+
+
+@st.cache_data(ttl=60)
+def get_dashboard_bundle() -> dict:
+    command = DOCKER_COMPOSE + [
+        "exec",
+        "-T",
+        "spark",
+        "spark-submit",
+        "/home/jovyan/jobs/spark/99_dashboard_bundle.py",
+    ]
+    result = run_command(command, timeout=600)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr or "No se pudo consultar el bundle del dashboard")
+
+    lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    json_line = next((line for line in reversed(lines) if line.startswith("{") and line.endswith("}")), None)
+    if not json_line:
+        raise RuntimeError("No se encontro salida JSON valida del bundle del dashboard")
+    return json.loads(json_line)
+
+
+def build_map_data(bundle: dict) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    ports = pd.DataFrame(bundle.get("dim_ports", []))
+    routes = pd.DataFrame(bundle.get("dim_routes", []))
+    ships = pd.DataFrame(bundle.get("ships_latest", []))
+    alerts = pd.DataFrame(bundle.get("fact_alerts", []))
+
+    if not routes.empty and not ports.empty:
+        origin_lookup = ports[["port_name", "lat", "lon"]].rename(columns={"lat": "origin_lat", "lon": "origin_lon"})
+        routes = routes.merge(origin_lookup, left_on="origin_port", right_on="port_name", how="left").drop(columns=["port_name"])
+        dest_lookup = ports[["port_name", "lat", "lon"]].rename(columns={"port_name": "dest_port", "lat": "dest_lat", "lon": "dest_lon"})
+        routes = routes.merge(dest_lookup, on="dest_port", how="left")
+
+    if not alerts.empty and not routes.empty:
+        routes = routes.merge(alerts[["via_port", "severity", "risk_level"]], left_on="dest_port", right_on="via_port", how="left")
+        routes["severity"] = routes["severity"].fillna(1)
+    else:
+        routes["severity"] = 1
+
+    if not routes.empty:
+        routes["color"] = routes["severity"].apply(
+            lambda sev: [220, 38, 38] if sev >= 4 else [245, 158, 11] if sev >= 3 else [59, 130, 246]
+        )
+
+    return ports, routes, ships, alerts
+
+
+def summarize_risk(bundle: dict) -> tuple[int, int, float]:
+    alerts = pd.DataFrame(bundle.get("fact_alerts", []))
+    weather = pd.DataFrame(bundle.get("fact_weather_operational", []))
+    critical = int((alerts["severity"] >= 4).sum()) if not alerts.empty else 0
+    medium = int((alerts["severity"] >= 2).sum()) if not alerts.empty else 0
+    avg_delay = float(weather["weather_delay_hours_estimate"].mean()) if not weather.empty else 0.0
+    return critical, medium, avg_delay
+
+
+def build_service_badge(badge: str) -> str:
+    return {
+        "OK": "ok",
+        "NOK": "nok",
+        "BOOT": "warn",
+        "OFF": "off",
+    }.get(badge, "off")
+
+
+def build_stock_table(bundle: dict) -> pd.DataFrame:
+    stock = pd.DataFrame(bundle.get("stock_valladolid", []))
+    orders = pd.DataFrame(bundle.get("customer_orders_douai", []))
+    if stock.empty:
+        return stock
+
+    if not orders.empty:
+        order_totals = orders.groupby("article_ref", as_index=False)["ordered_pieces"].sum()
+        order_totals = order_totals.rename(columns={"ordered_pieces": "douai_ordered_pieces"})
+        stock = stock.merge(order_totals, on="article_ref", how="left")
+    else:
+        stock["douai_ordered_pieces"] = 0
+
+    stock["douai_ordered_pieces"] = stock["douai_ordered_pieces"].fillna(0).astype(int)
+    stock["available_after_orders"] = stock["total_stock_pieces"] - stock["douai_ordered_pieces"]
+    stock["stock_status"] = stock.apply(
+        lambda row: "ROJO"
+        if row["available_after_orders"] <= row["safety_stock_min"]
+        else "NARANJA"
+        if row["available_after_orders"] <= row["safety_stock_min"] + row["daily_consumption_avg"] * 2
+        else "VERDE",
+        axis=1,
+    )
+    stock["status_dot"] = stock["stock_status"].map({"VERDE": "🟢", "NARANJA": "🟠", "ROJO": "🔴"})
+    stock = stock.rename(
+        columns={
+            "article_ref": "Referencia articulo",
+            "article_name": "Designacion articulo",
+            "total_stock_packs": "Cantidad total embalajes",
+            "total_stock_pieces": "Cantidad total piezas",
+            "pieces_per_pack": "Piezas por embalaje",
+            "daily_consumption_avg": "Consumo medio diario",
+            "safety_stock_min": "Stock minimo seguridad",
+            "douai_ordered_pieces": "Pedido cliente Douai (piezas)",
+            "available_after_orders": "Disponible tras pedido",
+            "status_dot": "Estado",
+        }
+    )
+    return stock[
+        [
+            "Estado",
+            "Referencia articulo",
+            "Designacion articulo",
+            "Piezas por embalaje",
+            "Consumo medio diario",
+            "Cantidad total embalajes",
+            "Cantidad total piezas",
+            "Stock minimo seguridad",
+            "Pedido cliente Douai (piezas)",
+            "Disponible tras pedido",
+        ]
+    ]
+
+
+def build_gantt(bundle: dict):
+    gantt = pd.DataFrame(bundle.get("article_gantt", []))
+    if gantt.empty:
+        return None
+    gantt["start_date"] = pd.to_datetime(gantt["start_date"])
+    gantt["end_date"] = pd.to_datetime(gantt["end_date"])
+    fig = px.timeline(
+        gantt,
+        x_start="start_date",
+        x_end="end_date",
+        y="article_ref",
+        color="transport_mode",
+        text="task_name",
+        hover_data=["industrial_week"],
+        color_discrete_map={
+            "sea": "#2563eb",
+            "air": "#dc2626",
+            "truck": "#0891b2",
+            "warehouse": "#16a34a",
+        },
+    )
+    fig.update_layout(
+        height=460,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(255,255,255,0.6)",
+        font_color="#10233f",
+        margin=dict(l=10, r=10, t=20, b=20),
+        xaxis_title="Calendario",
+        yaxis_title="Referencia articulo",
+    )
+    fig.update_yaxes(autorange="reversed")
+    return fig
+
+
+st.set_page_config(page_title="Dashboard KDD Logistica", layout="wide")
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+
+with st.sidebar:
+    st.subheader("Controles")
+    if st.button("Refrescar dashboard"):
+        st.cache_data.clear()
+        st.rerun()
+    if st.button("Levantar stack completo"):
+        st.code(run_command(["docker-compose", "up", "-d", "postgres", "kafka", "nifi", "spark", "cassandra", "namenode", "datanode", "airflow-webserver"], timeout=600).stdout)
+        st.cache_data.clear()
+    if st.button("Parar stack completo"):
+        st.code(run_command(["docker-compose", "down"], timeout=600).stdout)
+        st.cache_data.clear()
+    if st.button("Rebuild tablas Hive demo"):
+        st.code(run_script("scripts/66_rebuild_hive_demo_tables.sh")[-3000:])
+    if st.button("Cargar Cassandra latest state"):
+        st.code(run_script("scripts/65_load_vehicle_latest_state_cassandra.sh")[-3000:])
+
+bundle = get_dashboard_bundle()
+service_rows = get_service_status()
+ok_count = sum(1 for row in service_rows if row["badge"] == "OK")
+nok_count = sum(1 for row in service_rows if row["badge"] == "NOK")
+off_count = sum(1 for row in service_rows if row["badge"] == "OFF")
+critical_alerts, medium_alerts, avg_delay = summarize_risk(bundle)
+
+hero_left, hero_right = st.columns([1.7, 0.9])
+with hero_left:
+    st.markdown("<div class='hero-eyebrow'>BIG DATA TRANSPORT MONITOR</div>", unsafe_allow_html=True)
+    st.markdown("<div class='hero-title'>Transport Pulse<br/>Dashboard</div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='hero-subtitle'>Centro de control del pipeline KDD: posicion de flota, riesgo meteorologico, alertas operativas, contingencia aerea, estado de servicios y analitica de red.</div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        """
+        <div>
+          <span class='tag-chip'>NiFi</span>
+          <span class='tag-chip'>Kafka</span>
+          <span class='tag-chip'>Spark + Hive</span>
+          <span class='tag-chip'>Cassandra</span>
+          <span class='tag-chip'>GraphFrames</span>
+          <span class='tag-chip'>Air Recovery</span>
+          <span class='tag-chip'>Airflow</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+with hero_right:
+    render_panel(
+        "Estado del pipeline",
+        "sincronizado",
+        f"Snapshots servidos desde Spark/Hive, HDFS y Cassandra.<br/><br/><strong>Servicios OK:</strong> {ok_count}/{len(service_rows)}<br/><strong>Riesgo medio:</strong> {'MEDIUM' if medium_alerts else 'LOW'}<br/><strong>Storage:</strong> HDFS + Hive",
+        height=250,
+    )
+
+metric_cols = st.columns(6)
+with metric_cols[0]:
+    render_card("Flota monitorizada", str(len(bundle.get("ships_latest", []))), "Ultimo estado por vehiculo")
+with metric_cols[1]:
+    render_card("Rutas bajo observacion", str(len(bundle.get("fact_alerts", []))), "Alertas operativas")
+with metric_cols[2]:
+    render_card("Riesgo meteo alto/medio", str(medium_alerts), "Fact weather operational")
+with metric_cols[3]:
+    render_card("Retraso medio actual", f"{avg_delay:.1f}h", "Impacto logístico")
+with metric_cols[4]:
+    render_card("Servicios NOK", str(nok_count), "Contenedores con incidencia")
+with metric_cols[5]:
+    render_card("Vehiculos impactados", str(critical_alerts), "Alertas severidad >= 4")
+
+tab_overview, tab_diagrams, tab_map, tab_stock, tab_ops = st.tabs([
+    "Resumen KDD",
+    "Diagramas",
+    "Mapa y Alertas",
+    "Stock Valladolid",
+    "Servicios",
+])
+
+with tab_overview:
+    left, right = st.columns([1.2, 0.8])
+    with left:
+        st.subheader("Alertas operativas")
+        st.dataframe(pd.DataFrame(bundle.get("fact_alerts", [])), use_container_width=True, hide_index=True)
+        st.subheader("Fact weather operational")
+        st.dataframe(pd.DataFrame(bundle.get("fact_weather_operational", [])), use_container_width=True, hide_index=True)
+    with right:
+        st.subheader("Contingencia aerea")
+        st.dataframe(pd.DataFrame(bundle.get("fact_air_recovery_options", [])), use_container_width=True, hide_index=True)
+        st.subheader("Estado operativo por vehiculo")
+        st.dataframe(pd.DataFrame(bundle.get("ships_latest", [])), use_container_width=True, hide_index=True)
+
+with tab_diagrams:
+    render_diagram("Flujo KDD", "pipeline general", flow_diagram_svg())
+    render_diagram("Diagrama de Secuencia", "interaccion entre componentes", sequence_diagram_svg())
+    render_diagram("Diagrama de Clases", "modelo conceptual", class_diagram_svg())
+    render_diagram("Casos de Uso", "escenarios de defensa", use_case_diagram_svg())
+
+with tab_map:
+    st.subheader("Seguimiento de flota y alertas de ruta")
+    ports_df, routes_df, ships_df, alerts_df = build_map_data(bundle)
+    layers = []
+    if not routes_df.empty:
+        layers.append(pdk.Layer("LineLayer", data=routes_df, get_source_position="[origin_lon, origin_lat]", get_target_position="[dest_lon, dest_lat]", get_color="color", get_width=6, pickable=True))
+    if not ports_df.empty:
+        layers.append(pdk.Layer("ScatterplotLayer", data=ports_df, get_position="[lon, lat]", get_radius=18000, get_fill_color=[31, 119, 180], pickable=True))
+    if not ships_df.empty:
+        layers.append(pdk.Layer("ScatterplotLayer", data=ships_df, get_position="[lon, lat]", get_radius=24000, get_fill_color=[220, 38, 38], pickable=True))
+    if layers:
+        st.pydeck_chart(
+            pdk.Deck(
+                map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+                initial_view_state=pdk.ViewState(latitude=36.5, longitude=3.0, zoom=2.3, pitch=20),
+                layers=layers,
+            ),
+            use_container_width=True,
+        )
+    mleft, mright = st.columns([1.2, 0.8])
+    with mleft:
+        st.subheader("Ultimo estado de barcos")
+        st.dataframe(ships_df, use_container_width=True, hide_index=True)
+        st.subheader("Red logistica activa")
+        st.dataframe(pd.DataFrame(bundle.get("graph_centrality", [])), use_container_width=True, hide_index=True)
+    with mright:
+        st.subheader("Alertas por puerto")
+        st.dataframe(alerts_df, use_container_width=True, hide_index=True)
+        st.subheader("Recuperacion aerea")
+        st.dataframe(pd.DataFrame(bundle.get("fact_air_recovery_options", [])), use_container_width=True, hide_index=True)
+
+with tab_stock:
+    st.subheader("Stock de almacen en Valladolid")
+    stock_df = build_stock_table(bundle)
+    if stock_df.empty:
+        st.info("Todavia no hay datos de stock preparados para Valladolid.")
+    else:
+        st.dataframe(stock_df, use_container_width=True, hide_index=True)
+
+    col_left, col_right = st.columns([1.05, 0.95])
+    with col_left:
+        st.subheader("Pedidos del cliente Douai")
+        st.dataframe(pd.DataFrame(bundle.get("customer_orders_douai", [])), use_container_width=True, hide_index=True)
+    with col_right:
+        st.subheader("Recuperacion multimodal")
+        st.dataframe(pd.DataFrame(bundle.get("fact_air_recovery_options", [])), use_container_width=True, hide_index=True)
+
+    st.subheader("Diagrama de Gantt por semanas industriales")
+    gantt_fig = build_gantt(bundle)
+    if gantt_fig is None:
+        st.info("Todavia no hay tareas de planificacion para mostrar en el Gantt.")
+    else:
+        st.plotly_chart(gantt_fig, use_container_width=True)
+
+with tab_ops:
+    st.subheader("Estado y control de servicios")
+    for row in service_rows:
+        cols = st.columns([2, 3, 2, 1, 1])
+        cols[0].write(f"**{row['service']}**")
+        cols[1].write(row["status"])
+        cols[2].markdown(f"<span class='status-pill {build_service_badge(row['badge'])}'>{row['badge']}</span>", unsafe_allow_html=True)
+        service_name = row["service"] if row["service"] != "airflow" else "airflow-webserver"
+        if cols[3].button("On", key=f"start_{row['service']}"):
+            st.code(compose_service_action(service_name, "start"))
+            st.rerun()
+        if cols[4].button("Off", key=f"stop_{row['service']}"):
+            st.code(compose_service_action(service_name, "stop"))
+            st.rerun()
+    oleft, oright = st.columns(2)
+    with oleft:
+        st.subheader("GraphFrames")
+        st.dataframe(pd.DataFrame(bundle.get("graph_centrality", [])), use_container_width=True, hide_index=True)
+    with oright:
+        st.subheader("Decision barco vs aereo")
+        st.dataframe(pd.DataFrame(bundle.get("fact_air_recovery_options", [])), use_container_width=True, hide_index=True)

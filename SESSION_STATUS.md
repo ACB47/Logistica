@@ -37,6 +37,10 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - El rebuild completo ya queda validado de nuevo: `fact_alerts` y el resto de tablas principales reaparecen correctamente tras `scripts/66_rebuild_hive_demo_tables.sh`.
 - Ya existe una base de dashboard en `Streamlit` con mapa, diagramas, estado de servicios y tablas clave para la defensa.
 - Ya existe en codigo un nuevo caso de uso de contingencia: comparacion `barco vs aereo+camion` hasta Valladolid mediante `jobs/spark/03_air_recovery_options.py`.
+- `logistica.fact_air_recovery_options` ya fue generada y consultada con un caso valido de comparacion `barco vs aereo+camion`.
+- Regla operativa confirmada: los `spark-submit` y `spark-sql` con Hive deben ejecutarse secuencialmente para evitar bloqueos de Derby en el metastore embebido.
+- Ya existe una ampliacion del dashboard para stock de Valladolid, pedidos de Douai y Gantt por semanas industriales apoyada en `dim_articles_valladolid`, `fact_customer_orders_douai` y `fact_article_gantt`.
+- El bundle del dashboard ya incorpora `eta_hours_estimate` por barco para conectar ETA con riesgo de stock y decisiones de contingencia.
 - Lo mas importante pendiente ahora es cerrar evidencias, Airflow visual, narrativa final de defensa y documentacion completa sobre la ruta Docker/local.
 
 ## Estado por fases KDD
@@ -134,9 +138,11 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
   - `jobs/spark/04_streaming_ml_pipeline.py` actualizado a ventanas de `15 minutes`
   - checkpoints streaming alineados a `hdfs://namenode:8020/hadoop/logistica/checkpoint/...`
   - modelado un caso de recuperacion aerea con comparacion de ETA, coste total y riesgo de stock
+  - modelado un panel de stock para Valladolid y pedidos de Douai con planificacion semanal
 - Falta para cerrar:
   - integracion completa de alertas y pruebas de extremo a extremo
-  - validar y poblar `logistica.fact_air_recovery_options`
+  - integrar visualmente `logistica.fact_air_recovery_options` en la demo final y en el dashboard
+  - validar visualmente el Gantt y el panel de stock en el dashboard
 
 ### Fase IV - Orquestacion
 - Estado: parcial y utilizable.

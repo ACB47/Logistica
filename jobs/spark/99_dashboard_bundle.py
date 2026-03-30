@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 
 from pyspark.sql import SparkSession, Window
-from pyspark.sql.functions import col, row_number
+from pyspark.sql.functions import col, expr, row_number
 
 
 def rows_to_dicts(dataframe, limit: int | None = None) -> list[dict]:
@@ -36,6 +36,9 @@ def main() -> None:
     payload: dict[str, object] = {
         "errors": errors,
         "ships_latest": [],
+        "stock_valladolid": [],
+        "customer_orders_douai": [],
+        "article_gantt": [],
         "fact_alerts": [],
         "fact_weather_operational": [],
         "fact_air_recovery_options": [],
@@ -63,11 +66,35 @@ def main() -> None:
             ships.withColumn("row_num", row_number().over(latest_window))
             .filter(col("row_num") == 1)
             .drop("row_num")
+            .withColumn(
+                "eta_hours_estimate",
+                expr(
+                    "round((greatest(0.0, 405.0 - (stock_on_hand * 0.4))) + 12.0, 1)"
+                ),
+            )
             .orderBy("ship_id")
         )
         payload["ships_latest"] = rows_to_dicts(ships_latest)
     except Exception as exc:  # pragma: no cover
         errors.append(f"ships_latest: {exc}")
+
+    try:
+        stock = spark.table("logistica.dim_articles_valladolid").orderBy("article_ref")
+        payload["stock_valladolid"] = rows_to_dicts(stock)
+    except Exception as exc:  # pragma: no cover
+        errors.append(f"dim_articles_valladolid: {exc}")
+
+    try:
+        orders = spark.table("logistica.fact_customer_orders_douai").orderBy("industrial_week", "article_ref")
+        payload["customer_orders_douai"] = rows_to_dicts(orders)
+    except Exception as exc:  # pragma: no cover
+        errors.append(f"fact_customer_orders_douai: {exc}")
+
+    try:
+        gantt = spark.table("logistica.fact_article_gantt").orderBy("industrial_week", "article_ref", "start_date")
+        payload["article_gantt"] = rows_to_dicts(gantt)
+    except Exception as exc:  # pragma: no cover
+        errors.append(f"fact_article_gantt: {exc}")
 
     try:
         fact_alerts = spark.table("logistica.fact_alerts").orderBy(col("severity").desc(), col("via_port"))

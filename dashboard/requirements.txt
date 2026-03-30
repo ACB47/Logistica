@@ -1,3 +1,7 @@
 streamlit==1.43.2
 pandas==2.2.3
 pydeck==0.9.1
+plotly==6.0.1
+
+# Nota: el dashboard usa Docker mediante CLI (`docker` / `docker-compose`),
+# no mediante la libreria Python `docker`, por lo que no hace falta anadirla.

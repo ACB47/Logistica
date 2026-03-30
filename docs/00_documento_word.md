@@ -325,6 +325,7 @@ El sistema compara dos alternativas logísticas:
 Factores de decisión:
 
 - posición GPS actual del barco
+- ETA estimada del barco (`Estimated Time Arrival`)
 - ETA restante marítima
 - retraso meteorológico y operativo
 - stock disponible y punto de reorden
@@ -340,6 +341,37 @@ Tabla objetivo:
 Resultado esperado:
 - recomendación explicable `MARITIMO` o `AEREO_CAMION`
 - estimación de ahorro de tiempo y coste total
+
+Ejemplo ya generado en la tabla:
+- `ship-001 | Algeciras | MARITIMO | ROTURA_INMINENTE | 411.5h barco | 25.8h aereo+camion | ahorro 385.7h | 17672.0 EUR`
+
+### 7.3 Stock de Valladolid y cliente Douai
+
+El dashboard incorpora un panel específico de stock en el almacén de Valladolid para piezas de componentes de automoción. Cada artículo muestra:
+
+- referencia numérica de 10 caracteres
+- designación del artículo
+- piezas por embalaje
+- consumo medio diario
+- cantidad total de embalajes
+- cantidad total de piezas
+- stock mínimo de seguridad
+- pedidos del cliente de Douai
+
+Además, se calcula un semáforo de stock:
+
+- verde: cobertura suficiente
+- naranja: cobertura tensionada
+- rojo: riesgo de rotura o cobertura crítica
+
+Para planificación visual, también se modela un Gantt por semanas industriales apoyado en:
+
+- `logistica.fact_customer_orders_douai`
+- `logistica.fact_article_gantt`
+
+Esto permite exponer no solo el estado actual del stock, sino también la secuencia logística prevista de cada artículo.
+
+Además, el panel de flota debe mostrar `ETA` por barco para poder enlazar visualmente la llegada estimada con el riesgo de ruptura de stock.
 
 ---
 
@@ -399,7 +431,12 @@ Incluye:
 - mapa de barcos con alertas de ruta
 - recomendaciones de recuperación `barco vs aereo+camion`
 - tablas curadas relevantes para la defensa
-- diagramas Mermaid: flujo, secuencia, clases y casos de uso
+- diagramas integrados: flujo, secuencia, clases y casos de uso
+- panel de stock de Valladolid y pedidos de Douai
+- Gantt por semanas industriales
+
+Nota tecnica:
+- para evitar bloqueos del metastore Derby, las consultas Hive en `spark-sql` y los `spark-submit` con soporte Hive deben ejecutarse de forma secuencial, no en paralelo.
 
 Ejecucion:
 
