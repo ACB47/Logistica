@@ -26,6 +26,15 @@ SERVICE_MAP = {
     "airflow": "logistica_airflow-webserver_1",
 }
 
+SHIP_CONSTRAINTS = {
+    "Huelga": 72,
+    "Tormenta": 96,
+    "Problemas geopoliticos": 120,
+    "Piratas": 144,
+    "Problemas tecnicos del barco": 60,
+    "Huelga de operaciones portuarias": 84,
+}
+
 CUSTOM_CSS = """
 <style>
   .stApp {
@@ -337,6 +346,11 @@ def get_dashboard_bundle() -> dict:
     return json.loads(output_file.read_text(encoding="utf-8"))
 
 
+def reset_dashboard_cache() -> None:
+    st.cache_data.clear()
+    st.rerun()
+
+
 def build_map_data(bundle: dict) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     ports = pd.DataFrame(bundle.get("dim_ports", []))
     routes = pd.DataFrame(bundle.get("dim_routes", []))
@@ -370,6 +384,17 @@ def summarize_risk(bundle: dict) -> tuple[int, int, float]:
     medium = int((alerts["severity"] >= 2).sum()) if not alerts.empty else 0
     avg_delay = float(weather["weather_delay_hours_estimate"].mean()) if not weather.empty else 0.0
     return critical, medium, avg_delay
+
+
+def enrich_ship_eta_dates(ships_df: pd.DataFrame) -> pd.DataFrame:
+    if ships_df.empty or "eta_hours_estimate" not in ships_df.columns:
+        return ships_df
+    ships_df = ships_df.copy()
+    base_now = datetime.now()
+    ships_df["eta_fecha"] = ships_df["eta_hours_estimate"].apply(
+        lambda hours: (base_now + timedelta(hours=float(hours))).strftime("%Y-%m-%d %H:%M") if pd.notna(hours) else "N/A"
+    )
+    return ships_df
 
 
 def build_control_tower_kpis(bundle: dict) -> dict[str, float | int | str]:
@@ -419,6 +444,49 @@ def build_control_tower_kpis(bundle: dict) -> dict[str, float | int | str]:
         "critical_refs": critical_refs,
         "avg_time_saved": avg_time_saved,
         "best_mode": best_mode,
+    }
+
+
+def build_ship_simulation(bundle: dict, ship_id: str | None, active_constraints: list[str]) -> dict[str, object] | None:
+    if not ship_id or ship_id == "Ninguno":
+        return None
+
+    ships = pd.DataFrame(bundle.get("ships_latest", []))
+    recovery = pd.DataFrame(bundle.get("fact_air_recovery_options", []))
+    if ships.empty or recovery.empty:
+        return None
+
+    ship_match = ships[ships["ship_id"] == ship_id]
+    recovery_match = recovery[recovery["ship_id"] == ship_id]
+    if ship_match.empty or recovery_match.empty:
+        return None
+
+    ship_row = ship_match.iloc[0]
+    recovery_row = recovery_match.iloc[0]
+    extra_hours = sum(SHIP_CONSTRAINTS[name] for name in active_constraints)
+    base_eta = float(recovery_row.get("ship_remaining_hours", ship_row.get("eta_hours_estimate", 0.0)) or 0.0)
+    recalculated_eta = round(base_eta + extra_hours, 1)
+    hours_until_stock_break = float(recovery_row.get("hours_until_stock_break", 0.0) or 0.0)
+    margin_hours = round(hours_until_stock_break - recalculated_eta, 1)
+    cover_status = "NO CUBRE" if margin_hours < 96 else "CUBRE"
+    air_eta = float(recovery_row.get("air_total_eta_hours", 0.0) or 0.0)
+    air_cost = float(recovery_row.get("air_total_cost_eur", 0.0) or 0.0)
+    recommendation = "AEREO_CAMION" if cover_status == "NO CUBRE" else "MARITIMO"
+
+    return {
+        "ship_id": ship_id,
+        "origin_port": ship_row.get("origin_port"),
+        "dest_port": ship_row.get("dest_port"),
+        "base_eta": base_eta,
+        "extra_hours": extra_hours,
+        "recalculated_eta": recalculated_eta,
+        "hours_until_stock_break": hours_until_stock_break,
+        "margin_hours": margin_hours,
+        "cover_status": cover_status,
+        "recommended_mode": recommendation,
+        "air_eta": air_eta,
+        "air_cost": air_cost,
+        "constraints": active_constraints,
     }
 
 
@@ -713,7 +781,21 @@ def build_orders_coverage(bundle: dict, customer_city: str | None = None) -> pd.
                 "air_total_cost_eur": float(best_option.iloc[0]["air_total_cost_eur"]) if not best_option.empty else 0.0,
             }
         )
-    return pd.DataFrame(rows)
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "order_id",
+            "article_ref",
+            "customer_city",
+            "industrial_week",
+            "needed_date_client",
+            "arrival_valladolid",
+            "margin_days",
+            "cover_status",
+            "recommended_mode",
+            "air_total_cost_eur",
+        ],
+    )
 
 
 def build_stock_horizon(bundle: dict, customer_city: str | None = None) -> pd.DataFrame:
@@ -732,10 +814,8 @@ def build_stock_horizon(bundle: dict, customer_city: str | None = None) -> pd.Da
             week_orders = orders_cov[(orders_cov["article_ref"] == stock_row["article_ref"]) & (orders_cov["industrial_week"] == week)]
             order_subset = raw_orders[(raw_orders["article_ref"] == stock_row["article_ref"]) & (raw_orders["industrial_week"] == week)]
             outbound = int(order_subset["ordered_pieces"].sum()) if not order_subset.empty else 0
-            inbound = int(
-                week_orders[week_orders["arrival_valladolid"].apply(lambda d: format_iw(pd.Timestamp(d)) == week)]["article_ref"].count()
-                * stock_row["pieces_per_pack"]
-            )
+            arrival_matches = week_orders[week_orders["arrival_valladolid"].apply(lambda d: format_iw(pd.Timestamp(d)) == week)] if not week_orders.empty else week_orders
+            inbound = int(len(arrival_matches.index) * stock_row["pieces_per_pack"])
             projected_stock = projected_stock + inbound - outbound
             cover_status = "NO CUBRE" if ((not week_orders.empty) and (week_orders["cover_status"] == "NO CUBRE").any()) else "CUBRE"
             rows.append(
@@ -816,8 +896,7 @@ with st.sidebar:
 
     st.markdown("#### 3. Acciones globales")
     if st.button("Refrescar dashboard"):
-        st.cache_data.clear()
-        st.rerun()
+        reset_dashboard_cache()
     if st.button("Levantar stack completo"):
         st.code(run_command(["docker-compose", "up", "-d", "postgres", "kafka", "nifi", "spark", "cassandra", "namenode", "datanode", "airflow-webserver"], timeout=600).stdout)
         st.cache_data.clear()
@@ -860,7 +939,7 @@ with st.sidebar:
     st.slider("Factor de demanda", 80, 140, 100)
     st.slider("Retraso adicional ETA (h)", 0, 120, 48)
     st.toggle("Activar contingencia aerea", value=True)
-    selected_week = st.selectbox("Semana industrial", ["IW14", "IW15", "IW16", "IW17"], index=0)
+    selected_week = st.selectbox("Semana industrial", ["Todas", "IW14", "IW15", "IW16", "IW17"], index=0)
     selected_customer = st.selectbox("Cliente destino", ["Todos", "Douai", "Cleon"], index=0)
 
     st.markdown("#### 6. Ayuda rapida")
@@ -957,14 +1036,15 @@ if current_page == "1. Resumen Ejecutivo":
 
 elif current_page == "2. Control Tower Valladolid":
     st.subheader("Stock Valladolid")
-    stock_df = build_stock_table(bundle, selected_customer, selected_week)
+    week_filter = None if selected_week == "Todas" else selected_week
+    stock_df = build_stock_table(bundle, selected_customer, week_filter)
     if stock_df.empty:
         st.info("Todavia no hay datos de stock preparados para Valladolid.")
     else:
         st.dataframe(stock_df, use_container_width=True, hide_index=True)
 
     st.subheader("Stock por referencia")
-    stock_fig = build_stock_bar_chart(bundle, selected_customer, selected_week)
+    stock_fig = build_stock_bar_chart(bundle, selected_customer, week_filter)
     if stock_fig is None:
         st.info("Todavia no hay suficiente informacion para pintar el stock por referencia.")
     else:
@@ -973,12 +1053,16 @@ elif current_page == "2. Control Tower Valladolid":
     stock_left, stock_right = st.columns([1.05, 0.95])
     with stock_left:
         st.subheader("Pedidos de cliente")
-        st.dataframe(filter_orders(bundle, selected_customer, selected_week), use_container_width=True, hide_index=True)
+        orders_view = filter_orders(bundle, selected_customer, week_filter)
+        if orders_view.empty:
+            st.info("No hay pedidos para este cliente/semana en el bundle actual.")
+        else:
+            st.dataframe(orders_view, use_container_width=True, hide_index=True)
     with stock_right:
         st.subheader("Flota y ETA")
-        st.dataframe(pd.DataFrame(bundle.get("ships_latest", [])), use_container_width=True, hide_index=True)
+        st.dataframe(enrich_ship_eta_dates(pd.DataFrame(bundle.get("ships_latest", []))), use_container_width=True, hide_index=True)
         st.subheader("Gantt por semanas industriales")
-        gantt_fig = build_gantt(bundle, selected_week)
+        gantt_fig = build_gantt(bundle, week_filter)
         if gantt_fig is None:
             st.info("Todavia no hay tareas de planificacion para mostrar en el Gantt.")
         else:
@@ -987,7 +1071,7 @@ elif current_page == "2. Control Tower Valladolid":
     lower_left, lower_right = st.columns([1.15, 0.85])
     with lower_left:
         st.subheader("Gantt de cobertura de stock vs ETA maritima")
-        stock_gantt = build_stock_rupture_gantt(bundle, selected_customer, selected_week)
+        stock_gantt = build_stock_rupture_gantt(bundle, selected_customer, week_filter)
         if stock_gantt is None:
             st.info("Todavia no hay suficiente informacion para calcular ruptura de stock por ETA maritima.")
         else:
@@ -998,11 +1082,13 @@ elif current_page == "2. Control Tower Valladolid":
         if horizon_df.empty:
             st.info("Todavia no hay datos para calcular el horizonte semanal de stock.")
         else:
+            if week_filter:
+                horizon_df = horizon_df[horizon_df["Semana industrial"] == week_filter]
             st.dataframe(horizon_df, use_container_width=True, hide_index=True)
 
     with lower_right:
         st.subheader("Propuesta de contingencia aerea")
-        contingency_df = build_air_contingency_table(bundle, selected_customer, selected_week)
+        contingency_df = build_air_contingency_table(bundle, selected_customer, week_filter)
         if contingency_df.empty:
             st.info("No hay referencias en rotura de stock con propuesta aerea disponible en este momento.")
         else:
@@ -1044,23 +1130,84 @@ elif current_page == "4. KDD Fase I - Ingesta":
         )
         st.dataframe(kafka_topics, use_container_width=True, hide_index=True)
     with ing_right:
-        st.subheader("Mapa y alertas de ruta")
         ports_df, routes_df, ships_df, alerts_df = build_map_data(bundle)
-        layers = []
-        if not routes_df.empty:
-            layers.append(pdk.Layer("LineLayer", data=routes_df, get_source_position="[origin_lon, origin_lat]", get_target_position="[dest_lon, dest_lat]", get_color="color", get_width=6, pickable=True))
-        if not ports_df.empty:
-            layers.append(pdk.Layer("ScatterplotLayer", data=ports_df, get_position="[lon, lat]", get_radius=18000, get_fill_color=[31, 119, 180], pickable=True))
-        if not ships_df.empty:
-            layers.append(pdk.Layer("ScatterplotLayer", data=ships_df, get_position="[lon, lat]", get_radius=24000, get_fill_color=[220, 38, 38], pickable=True))
-        if layers:
-            st.pydeck_chart(
-                pdk.Deck(
-                    map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-                    initial_view_state=pdk.ViewState(latitude=36.5, longitude=3.0, zoom=2.3, pitch=20),
-                    layers=layers,
-                ),
+        ship_options = ["Todos"]
+        if not ships_df.empty and "ship_id" in ships_df.columns:
+            ship_options.extend(sorted(ships_df["ship_id"].dropna().tolist()))
+        selected_ship = st.selectbox("Barco concreto", ship_options, index=0, key="ingesta_selected_ship")
+        st.caption("Activa incidencias para recalcular ETA y cobertura de stock")
+        risk_cols = st.columns(2)
+        active_constraints = []
+        for idx, label in enumerate(SHIP_CONSTRAINTS.keys()):
+            with risk_cols[idx % 2]:
+                if st.toggle(label, value=False, key=f"risk_{label}"):
+                    active_constraints.append(label)
+        ship_simulation = build_ship_simulation(bundle, None if selected_ship == "Todos" else selected_ship, active_constraints)
+
+        ship_table_df = ships_df.copy() if not ships_df.empty else pd.DataFrame()
+        if not ship_table_df.empty and selected_ship != "Todos":
+            ship_table_df = ship_table_df[ship_table_df["ship_id"] == selected_ship]
+        if ship_simulation and not ship_table_df.empty and "ship_id" in ship_table_df.columns:
+            ship_table_df.loc[ship_table_df["ship_id"] == ship_simulation["ship_id"], "eta_hours_estimate"] = ship_simulation["recalculated_eta"]
+            ship_table_df.loc[ship_table_df["ship_id"] == ship_simulation["ship_id"], "simulation_cover_status"] = ship_simulation["cover_status"]
+        ship_table_df = enrich_ship_eta_dates(ship_table_df)
+
+        st.subheader("Tabla de barcos y ETA")
+        if ship_table_df.empty:
+            st.info("Todavia no hay barcos en el bundle actual.")
+        else:
+            st.dataframe(
+                ship_table_df[[c for c in ship_table_df.columns if c in ["ship_id", "origin_port", "dest_port", "lat", "lon", "eta_fecha", "simulation_cover_status"]]],
                 use_container_width=True,
+                hide_index=True,
+            )
+
+    st.subheader("Posicionamiento GPS de barcos")
+    ports_df, routes_df, ships_df, alerts_df = build_map_data(bundle)
+    layers = []
+    if not ships_df.empty:
+        ships_df = ships_df.copy()
+        if selected_ship != "Todos":
+            ships_df = ships_df[ships_df["ship_id"] == selected_ship]
+        ships_df = enrich_ship_eta_dates(ships_df)
+        ships_df["fill_color"] = ships_df["origin_port"].apply(
+            lambda origin: [220, 38, 38] if origin == "Shanghai" else [37, 99, 235]
+        )
+        if ship_simulation and selected_ship != "Todos":
+            ships_df.loc[ships_df["ship_id"] == ship_simulation["ship_id"], "fill_color"] = [220, 38, 38] if ship_simulation["cover_status"] == "NO CUBRE" else [245, 158, 11]
+        ships_df["tooltip_text"] = ships_df.apply(
+            lambda row: f"Barco: {row.get('ship_id', '')}\nOrigen: {row.get('origin_port', '')}\nDestino: {row.get('dest_port', '')}\nETA: {((datetime.now() + timedelta(hours=float(ship_simulation['recalculated_eta']))) .strftime('%Y-%m-%d %H:%M')) if ship_simulation and row.get('ship_id') == ship_simulation['ship_id'] else row.get('eta_fecha', 'N/A')}",
+            axis=1,
+        )
+        layers.append(pdk.Layer("ScatterplotLayer", data=ships_df, get_position="[lon, lat]", get_radius=32000, get_fill_color="fill_color", pickable=True))
+    if layers:
+        st.pydeck_chart(
+            pdk.Deck(
+                map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+                initial_view_state=pdk.ViewState(latitude=35.0, longitude=78.0, zoom=1.55, pitch=8),
+                layers=layers,
+                tooltip={"text": "{tooltip_text}"},
+            ),
+            use_container_width=True,
+        )
+    else:
+        st.info("Todavia no hay posiciones GPS de barcos disponibles en el bundle actual.")
+
+    if ship_simulation:
+        recalculated_eta_dt = (datetime.now() + timedelta(hours=float(ship_simulation["recalculated_eta"]))).strftime("%Y-%m-%d %H:%M")
+        sim_cols = st.columns(5)
+        sim_cols[0].metric("Barco", ship_simulation["ship_id"])
+        sim_cols[1].metric("ETA base", f"{ship_simulation['base_eta']} h")
+        sim_cols[2].metric("Horas extra", f"{ship_simulation['extra_hours']} h")
+        sim_cols[3].metric("ETA recalculada", recalculated_eta_dt)
+        sim_cols[4].metric("Cobertura", ship_simulation["cover_status"])
+        if ship_simulation["cover_status"] == "NO CUBRE":
+            st.error(
+                f"ALERTA: {ship_simulation['ship_id']} no cubre stock. Activar envio aereo. ETA recalculada: {recalculated_eta_dt} | ETA aereo: {ship_simulation['air_eta']} h | Coste aereo: {ship_simulation['air_cost']} EUR"
+            )
+        else:
+            st.success(
+                f"{ship_simulation['ship_id']} cubre stock. ETA recalculada: {recalculated_eta_dt} | Margen sobre stock: {ship_simulation['margin_hours']} h"
             )
 
 elif current_page == "5. KDD Fase II - Spark":
@@ -1092,8 +1239,8 @@ elif current_page == "7. Persistencia":
         st.dataframe(hive_tables, use_container_width=True, hide_index=True)
     with p_right:
         st.subheader("Cassandra")
-        cass_df = pd.DataFrame(bundle.get("ships_latest", []))
-        st.dataframe(cass_df[[c for c in cass_df.columns if c in ["ship_id", "route_id", "dest_port", "stock_on_hand", "eta_hours_estimate"]]], use_container_width=True, hide_index=True)
+        cass_df = enrich_ship_eta_dates(pd.DataFrame(bundle.get("ships_latest", [])))
+        st.dataframe(cass_df[[c for c in cass_df.columns if c in ["ship_id", "route_id", "dest_port", "stock_on_hand", "eta_fecha"]]], use_container_width=True, hide_index=True)
 
 elif current_page == "8. Orquestacion":
     st.subheader("Airflow y orquestación")

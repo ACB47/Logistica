@@ -210,8 +210,10 @@ Logistica/
 
 ## Caso de uso
 
-- **Origen**: puerto Shanghai (China).
+- **Origen principal**: puerto Shanghai (China).
+- **Origen alternativo**: puerto Yokohama (Japón).
 - **Destino**: Algeciras / Valencia / Barcelona.
+- **Cliente final**: Valladolid -> clientes en Douai y Cleon.
 - **Objetivo**: monitorizar barcos (GPS) y, si hay alertas (geopolítica o clima adverso), **avisar** para activar un plan de contingencia.
 
 ## Caso de uso extendido: recuperación aérea hasta Valladolid
@@ -242,6 +244,30 @@ Recomendación final esperada:
 - `AEREO_CAMION` si la alternativa aérea evita rotura de stock y mejora el ETA con un coste justificable
 
 El panel de barcos del dashboard también incorpora `ETA` por barco para visualizar de forma directa si la llegada prevista compromete el stock.
+
+Además, la demo permite:
+
+- seleccionar un barco concreto
+- activar incidencias simuladas (`Huelga`, `Tormenta`, `Piratas`, `Problemas geopolíticos`, `Problemas técnicos`, `Huelga portuaria`)
+- recalcular ETA y cobertura de stock
+- lanzar una alerta si el suministro queda en `NO CUBRE`
+
+## Interactividad del dashboard
+
+El dashboard permite filtros y simulaciones en tiempo de demo:
+
+- cliente destino: `Douai` o `Cleon`
+- semana industrial
+- barco concreto
+- incidencias activables por barco
+
+Con estos controles se recalculan:
+
+- pedidos visibles
+- stock de Valladolid
+- horizonte de 10 semanas
+- Gantt de cobertura
+- propuesta de contingencia aérea
 
 Ejemplo ya generado en tabla:
 

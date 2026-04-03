@@ -345,7 +345,7 @@ Resultado esperado:
 Ejemplo ya generado en la tabla:
 - `ship-001 | Algeciras | MARITIMO | ROTURA_INMINENTE | 411.5h barco | 25.8h aereo+camion | ahorro 385.7h | 17672.0 EUR`
 
-### 7.3 Stock de Valladolid y cliente Douai
+### 7.3 Stock de Valladolid y clientes Douai / Cleon
 
 El dashboard incorpora un panel específico de stock en el almacén de Valladolid para piezas de componentes de automoción. Cada artículo muestra:
 
@@ -356,7 +356,7 @@ El dashboard incorpora un panel específico de stock en el almacén de Valladoli
 - cantidad total de embalajes
 - cantidad total de piezas
 - stock mínimo de seguridad
-- pedidos del cliente de Douai
+- pedidos de los clientes de Douai y Cleon
 
 Además, se calcula un semáforo de stock:
 
@@ -372,6 +372,15 @@ Para planificación visual, también se modela un Gantt por semanas industriales
 Esto permite exponer no solo el estado actual del stock, sino también la secuencia logística prevista de cada artículo.
 
 Además, el panel de flota debe mostrar `ETA` por barco para poder enlazar visualmente la llegada estimada con el riesgo de ruptura de stock.
+
+El dashboard permite además:
+
+- filtrar por cliente (`Douai` / `Cleon`)
+- filtrar por semana industrial
+- seleccionar un barco concreto
+- activar incidencias simuladas sobre ese barco
+
+Con esos controles, la interfaz recalcula si la llegada sigue `CUBRIENDO` o `NO CUBRIENDO` el stock.
 
 ---
 
