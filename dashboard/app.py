@@ -556,8 +556,13 @@ def build_stock_rupture_gantt(bundle: dict):
     rows: list[dict] = []
     for _, row in stock.iterrows():
         maritime = air[air["dest_port"] == row.get("inbound_port")]
-        ship_eta = float(maritime.iloc[0]["ship_remaining_hours"]) if not maritime.empty else 240.0
-        stockout_hours = float(row["hours_to_stockout"])
+        if not maritime.empty and pd.notna(maritime.iloc[0].get("ship_remaining_hours")):
+            ship_eta = float(maritime.iloc[0]["ship_remaining_hours"])
+        else:
+            ship_eta = 240.0
+
+        stockout_value = row.get("hours_to_stockout", 0.0)
+        stockout_hours = float(stockout_value) if pd.notna(stockout_value) else 0.0
         stockout_date = now + timedelta(hours=stockout_hours)
         ship_arrival_date = now + timedelta(hours=ship_eta)
         rows.append(
