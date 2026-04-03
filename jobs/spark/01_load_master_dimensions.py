@@ -25,10 +25,16 @@ SKUS = [
 ]
 
 ARTICLES_VALLADOLID = [
-    ("1000001023", "Modulo ABS delantero", "componentes coche", 18, 42, 756, 420, 2, "Valladolid"),
-    ("1000002087", "Centralita motor ECU", "electronica coche", 6, 11, 66, 90, 4, "Valladolid"),
-    ("1000003154", "Juego de sensores radar", "asistencia conduccion", 10, 16, 160, 120, 2, "Valladolid"),
-    ("1000004278", "Bomba de combustible", "powertrain", 12, 35, 420, 240, 3, "Valladolid"),
+    ("1000001023", "Modulo ABS delantero", "componentes coche", 18, 42, 756, 420, 2, "Valladolid", "Algeciras"),
+    ("1000002087", "Centralita motor ECU", "electronica coche", 6, 11, 66, 90, 4, "Valladolid", "Valencia"),
+    ("1000003154", "Juego de sensores radar", "asistencia conduccion", 10, 16, 160, 120, 2, "Valladolid", "Barcelona"),
+    ("1000004278", "Bomba de combustible", "powertrain", 12, 35, 480, 240, 4, "Valladolid", "Algeciras"),
+    ("1000005311", "Modulo airbag lateral", "seguridad pasiva", 16, 18, 288, 130, 3, "Valladolid", "Valencia"),
+    ("1000006422", "Cableado de puerta", "electrico interior", 20, 25, 500, 180, 4, "Valladolid", "Barcelona"),
+    ("1000007533", "Sensor de angulo volante", "direccion", 14, 9, 150, 80, 3, "Valladolid", "Algeciras"),
+    ("1000008644", "Modulo de climatizacion HVAC", "confort", 8, 7, 90, 50, 3, "Valladolid", "Valencia"),
+    ("1000009755", "Motor limpia parabrisas", "electromecanico", 10, 22, 220, 110, 3, "Valladolid", "Barcelona"),
+    ("1000010866", "Camara ADAS frontal", "vision inteligente", 6, 6, 60, 32, 3, "Valladolid", "Algeciras"),
 ]
 
 CUSTOMER_ORDERS_DOUAI = [
@@ -36,6 +42,12 @@ CUSTOMER_ORDERS_DOUAI = [
     ("ORD-DOU-002", "1000002087", "Douai", "FR", "IW14", "2026-04-02", "2026-04-05", 8, 48, "risk_stock"),
     ("ORD-DOU-003", "1000003154", "Douai", "FR", "IW15", "2026-04-06", "2026-04-11", 7, 112, "sea_committed"),
     ("ORD-DOU-004", "1000004278", "Douai", "FR", "IW15", "2026-04-07", "2026-04-12", 12, 144, "sea_committed"),
+    ("ORD-DOU-005", "1000005311", "Douai", "FR", "IW15", "2026-04-07", "2026-04-10", 4, 64, "sea_committed"),
+    ("ORD-DOU-006", "1000006422", "Douai", "FR", "IW15", "2026-04-08", "2026-04-11", 6, 120, "sea_committed"),
+    ("ORD-DOU-007", "1000007533", "Douai", "FR", "IW16", "2026-04-11", "2026-04-13", 2, 28, "sea_committed"),
+    ("ORD-DOU-008", "1000008644", "Douai", "FR", "IW16", "2026-04-12", "2026-04-14", 2, 16, "sea_committed"),
+    ("ORD-DOU-009", "1000009755", "Douai", "FR", "IW16", "2026-04-13", "2026-04-15", 5, 50, "sea_committed"),
+    ("ORD-DOU-010", "1000010866", "Douai", "FR", "IW16", "2026-04-13", "2026-04-15", 1, 6, "risk_stock"),
 ]
 
 ARTICLE_GANTT = [
@@ -49,6 +61,19 @@ ARTICLE_GANTT = [
     ("1000003154", "Entrega cliente Douai", "2026-04-10", "2026-04-11", "IW15", "truck"),
     ("1000004278", "Recepcion maritima", "2026-04-06", "2026-04-11", "IW15", "sea"),
     ("1000004278", "Entrega cliente Douai", "2026-04-11", "2026-04-12", "IW15", "truck"),
+    ("1000005311", "Recepcion maritima", "2026-04-07", "2026-04-10", "IW15", "sea"),
+    ("1000005311", "Entrega cliente Douai", "2026-04-10", "2026-04-11", "IW15", "truck"),
+    ("1000006422", "Recepcion maritima", "2026-04-08", "2026-04-10", "IW15", "sea"),
+    ("1000006422", "Entrega cliente Douai", "2026-04-10", "2026-04-11", "IW15", "truck"),
+    ("1000007533", "Recepcion maritima", "2026-04-10", "2026-04-12", "IW16", "sea"),
+    ("1000007533", "Entrega cliente Douai", "2026-04-12", "2026-04-13", "IW16", "truck"),
+    ("1000008644", "Recepcion maritima", "2026-04-11", "2026-04-13", "IW16", "sea"),
+    ("1000008644", "Entrega cliente Douai", "2026-04-13", "2026-04-14", "IW16", "truck"),
+    ("1000009755", "Recepcion maritima", "2026-04-11", "2026-04-14", "IW16", "sea"),
+    ("1000009755", "Entrega cliente Douai", "2026-04-14", "2026-04-15", "IW16", "truck"),
+    ("1000010866", "Alternativa aerea Shanghai-Madrid", "2026-04-12", "2026-04-13", "IW16", "air"),
+    ("1000010866", "Camion Madrid-Valladolid", "2026-04-13", "2026-04-13", "IW16", "truck"),
+    ("1000010866", "Expedicion Valladolid-Douai", "2026-04-14", "2026-04-15", "IW16", "truck"),
 ]
 
 AIRPORTS = [
@@ -121,6 +146,7 @@ def main() -> None:
             "safety_stock_min",
             "total_stock_packs",
             "warehouse_name",
+            "inbound_port",
         ],
     )
     fact_customer_orders_douai = spark.createDataFrame(

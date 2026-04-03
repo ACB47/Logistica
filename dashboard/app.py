@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
+from datetime import datetime, timedelta
 
 import pandas as pd
 import plotly.express as px
@@ -465,11 +466,13 @@ def build_stock_table(bundle: dict) -> pd.DataFrame:
             "douai_ordered_pieces": "Pedido cliente Douai (piezas)",
             "available_after_orders": "Disponible tras pedido",
             "status_dot": "Estado",
+            "stock_status": "Status Stock",
         }
     )
     return stock[
         [
             "Estado",
+            "Status Stock",
             "Referencia articulo",
             "Designacion articulo",
             "Piezas por embalaje",
@@ -481,6 +484,162 @@ def build_stock_table(bundle: dict) -> pd.DataFrame:
             "Disponible tras pedido",
         ]
     ]
+
+
+def build_stock_context(bundle: dict) -> pd.DataFrame:
+    stock = pd.DataFrame(bundle.get("stock_valladolid", []))
+    orders = pd.DataFrame(bundle.get("customer_orders_douai", []))
+    if stock.empty:
+        return stock
+
+    if not orders.empty:
+        order_totals = orders.groupby("article_ref", as_index=False)["ordered_pieces"].sum()
+        order_totals = order_totals.rename(columns={"ordered_pieces": "douai_ordered_pieces"})
+        stock = stock.merge(order_totals, on="article_ref", how="left")
+    else:
+        stock["douai_ordered_pieces"] = 0
+
+    stock["douai_ordered_pieces"] = stock["douai_ordered_pieces"].fillna(0).astype(int)
+    stock["available_after_orders"] = stock["total_stock_pieces"] - stock["douai_ordered_pieces"]
+    stock["stock_status"] = stock.apply(
+        lambda row: "ROJO"
+        if row["available_after_orders"] <= row["safety_stock_min"]
+        else "NARANJA"
+        if row["available_after_orders"] <= row["safety_stock_min"] + row["daily_consumption_avg"] * 2
+        else "VERDE",
+        axis=1,
+    )
+    stock["hours_to_stockout"] = stock.apply(
+        lambda row: round(max(0.0, row["available_after_orders"]) / row["daily_consumption_avg"] * 24, 1)
+        if row["daily_consumption_avg"] > 0
+        else 0.0,
+        axis=1,
+    )
+    return stock
+
+
+def build_stock_bar_chart(bundle: dict):
+    stock_df = build_stock_table(bundle)
+    if stock_df.empty:
+        return None
+
+    color_map = {"VERDE": "#16a34a", "NARANJA": "#f59e0b", "ROJO": "#dc2626"}
+    fig = px.bar(
+        stock_df,
+        x="Referencia articulo",
+        y="Cantidad total piezas",
+        color="Status Stock",
+        color_discrete_map=color_map,
+        text="Cantidad total piezas",
+    )
+    fig.update_layout(
+        height=360,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(255,255,255,0.6)",
+        font_color="#10233f",
+        margin=dict(l=10, r=10, t=20, b=10),
+        xaxis_title="Referencias",
+        yaxis_title="Piezas en stock",
+        legend_title="Semaforo stock",
+    )
+    fig.update_traces(textposition="outside")
+    return fig
+
+
+def build_stock_rupture_gantt(bundle: dict):
+    stock = build_stock_context(bundle)
+    air = pd.DataFrame(bundle.get("fact_air_recovery_options", []))
+    if stock.empty:
+        return None
+
+    now = datetime.now()
+    rows: list[dict] = []
+    for _, row in stock.iterrows():
+        maritime = air[air["dest_port"] == row.get("inbound_port")]
+        ship_eta = float(maritime.iloc[0]["ship_remaining_hours"]) if not maritime.empty else 240.0
+        stockout_hours = float(row["hours_to_stockout"])
+        stockout_date = now + timedelta(hours=stockout_hours)
+        ship_arrival_date = now + timedelta(hours=ship_eta)
+        rows.append(
+            {
+                "article_ref": row["article_ref"],
+                "task_name": "Cobertura stock Valladolid",
+                "start_date": now,
+                "end_date": stockout_date,
+                "industrial_week": "Stock window",
+                "transport_mode": "stock",
+            }
+        )
+        rows.append(
+            {
+                "article_ref": row["article_ref"],
+                "task_name": "Llegada maritima estimada",
+                "start_date": now,
+                "end_date": ship_arrival_date,
+                "industrial_week": "Sea ETA",
+                "transport_mode": "sea_eta",
+            }
+        )
+
+    gantt = pd.DataFrame(rows)
+    fig = px.timeline(
+        gantt,
+        x_start="start_date",
+        x_end="end_date",
+        y="article_ref",
+        color="transport_mode",
+        text="task_name",
+        hover_data=["industrial_week"],
+        color_discrete_map={
+            "stock": "#16a34a",
+            "sea_eta": "#2563eb",
+        },
+    )
+    fig.update_layout(
+        height=430,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(255,255,255,0.6)",
+        font_color="#10233f",
+        margin=dict(l=10, r=10, t=20, b=20),
+        xaxis_title="Calendario y semana industrial",
+        yaxis_title="Referencia articulo",
+        legend_title="Tipo de barra",
+    )
+    fig.update_yaxes(autorange="reversed")
+    return fig
+
+
+def build_air_contingency_table(bundle: dict) -> pd.DataFrame:
+    stock = build_stock_context(bundle)
+    orders = pd.DataFrame(bundle.get("customer_orders_douai", []))
+    air = pd.DataFrame(bundle.get("fact_air_recovery_options", []))
+    if stock.empty or orders.empty or air.empty:
+        return pd.DataFrame()
+
+    risk_stock = stock[stock["stock_status"] == "ROJO"].copy()
+    if risk_stock.empty:
+        return pd.DataFrame()
+
+    rows = []
+    now = datetime.now()
+    for _, row in risk_stock.iterrows():
+        order_match = orders[orders["article_ref"] == row["article_ref"]]
+        best_air = air[air["dest_port"] == row["inbound_port"]]
+        if order_match.empty or best_air.empty:
+            continue
+        order = order_match.iloc[0]
+        option = best_air.iloc[0]
+        arrival_dt = now + timedelta(hours=float(option["air_total_eta_hours"]))
+        rows.append(
+            {
+                "Referencia": row["article_ref"],
+                "Pedido": order["order_id"],
+                "Alternativa aerea": f"Shanghai -> {option['air_dest_city']} + camion Valladolid",
+                "Llegada Valladolid": arrival_dt.strftime("%Y-%m-%d %H:%M"),
+                "Sobre coste aereo (EUR)": round(float(option["air_total_cost_eur"]), 2),
+            }
+        )
+    return pd.DataFrame(rows)
 
 
 def build_gantt(bundle: dict):
@@ -521,7 +680,27 @@ st.set_page_config(page_title="Dashboard KDD Logistica", layout="wide")
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 with st.sidebar:
-    st.subheader("Controles")
+    st.markdown("### Control Tower")
+    st.caption("Supervision KDD y operacion logistica")
+
+    st.markdown("#### 1. Estado del stack")
+    service_rows = get_service_status()
+    for row in service_rows:
+        icon = {"OK": "🟢", "NOK": "🔴", "BOOT": "🟠", "OFF": "⚫"}.get(row["badge"], "⚪")
+        st.markdown(f"- {icon} **{row['service']}**: {row['badge']}")
+
+    st.markdown("#### 2. Accesos rapidos")
+    st.markdown(
+        """
+        - NiFi: `https://localhost:8443`
+        - Airflow: `http://localhost:8085`
+        - NameNode: `http://localhost:9870`
+        - Spark UI: `http://localhost:4040`
+        - Cassandra: `localhost:9042`
+        """
+    )
+
+    st.markdown("#### 3. Acciones globales")
     if st.button("Refrescar dashboard"):
         st.cache_data.clear()
         st.rerun()
@@ -536,8 +715,52 @@ with st.sidebar:
     if st.button("Cargar Cassandra latest state"):
         st.code(run_script("scripts/65_load_vehicle_latest_state_cassandra.sh")[-3000:])
 
+    st.markdown("#### 4. Navegacion recomendada")
+    page_options = [
+        "1. Resumen Ejecutivo",
+        "2. Control Tower Valladolid",
+        "3. Arquitectura en vivo",
+        "4. KDD Fase I - Ingesta",
+        "5. KDD Fase II - Spark",
+        "6. GraphFrames",
+        "7. Persistencia",
+        "8. Orquestacion",
+        "9. Evidencias KDD",
+    ]
+    if "dashboard_page" not in st.session_state:
+        st.session_state["dashboard_page"] = page_options[0]
+
+    for page_name in page_options:
+        if st.button(page_name, use_container_width=True, key=f"nav_{page_name}"):
+            st.session_state["dashboard_page"] = page_name
+
+    current_page = st.radio(
+        "Seccion actual",
+        page_options,
+        index=page_options.index(st.session_state["dashboard_page"]),
+        key="dashboard_page_radio",
+    )
+    st.session_state["dashboard_page"] = current_page
+
+    st.markdown("#### 5. Parametros de demo")
+    st.slider("Factor de demanda", 80, 140, 100)
+    st.slider("Retraso adicional ETA (h)", 0, 120, 48)
+    st.toggle("Activar contingencia aerea", value=True)
+    st.selectbox("Semana industrial", ["IW14", "IW15", "IW16"], index=0)
+    st.selectbox("Cliente destino", ["Douai"], index=0)
+
+    st.markdown("#### 6. Ayuda rapida")
+    st.markdown(
+        """
+        - Verde: cobertura suficiente
+        - Naranja: cobertura tensionada
+        - Rojo: riesgo de rotura
+        - Primero revisa stock Valladolid y ETA
+        - Luego consulta contingencia aerea
+        """
+    )
+
 bundle = get_dashboard_bundle()
-service_rows = get_service_status()
 ok_count = sum(1 for row in service_rows if row["badge"] == "OK")
 nok_count = sum(1 for row in service_rows if row["badge"] == "NOK")
 off_count = sum(1 for row in service_rows if row["badge"] == "OFF")
@@ -547,7 +770,7 @@ kpis = build_control_tower_kpis(bundle)
 hero_left, hero_right = st.columns([1.7, 0.9])
 with hero_left:
     st.markdown("<div class='hero-eyebrow'>BIG DATA TRANSPORT MONITOR</div>", unsafe_allow_html=True)
-    st.markdown("<div class='hero-title'>Transport Pulse<br/>Dashboard</div>", unsafe_allow_html=True)
+    st.markdown("<div class='hero-title'>2026: Predictive<br/>Logistics</div>", unsafe_allow_html=True)
     st.markdown(
         "<div class='hero-subtitle'>Centro de control del pipeline KDD: posicion de flota, riesgo meteorologico, alertas operativas, contingencia aerea, estado de servicios y analitica de red.</div>",
         unsafe_allow_html=True,
@@ -588,19 +811,9 @@ with metric_cols[4]:
 with metric_cols[5]:
     render_card("Referencias críticas", str(kpis['critical_refs']), "Riesgo de rotura de stock")
 
-tab_exec, tab_tower, tab_arch, tab_ingesta, tab_spark, tab_graph, tab_persist, tab_airflow, tab_evidence = st.tabs([
-    "1. Resumen Ejecutivo",
-    "2. Control Tower Valladolid",
-    "3. Arquitectura en Vivo",
-    "4. KDD Fase I - Ingesta",
-    "5. KDD Fase II - Spark",
-    "6. GraphFrames - Red logística",
-    "7. Persistencia",
-    "8. Orquestación",
-    "9. Evidencias KDD",
-])
+current_page = st.session_state.get("dashboard_page", "1. Resumen Ejecutivo")
 
-with tab_exec:
+if current_page == "1. Resumen Ejecutivo":
     left, right = st.columns([1.1, 0.9])
     with left:
         st.subheader("Gestión por excepción")
@@ -628,15 +841,23 @@ with tab_exec:
         summary_df["Valor"] = summary_df["Valor"].astype(str)
         st.dataframe(summary_df, use_container_width=True, hide_index=True)
 
-with tab_tower:
-    stock_left, stock_right = st.columns([1.1, 0.9])
+elif current_page == "2. Control Tower Valladolid":
+    st.subheader("Stock Valladolid")
+    stock_df = build_stock_table(bundle)
+    if stock_df.empty:
+        st.info("Todavia no hay datos de stock preparados para Valladolid.")
+    else:
+        st.dataframe(stock_df, use_container_width=True, hide_index=True)
+
+    st.subheader("Stock por referencia")
+    stock_fig = build_stock_bar_chart(bundle)
+    if stock_fig is None:
+        st.info("Todavia no hay suficiente informacion para pintar el stock por referencia.")
+    else:
+        st.plotly_chart(stock_fig, use_container_width=True)
+
+    stock_left, stock_right = st.columns([1.05, 0.95])
     with stock_left:
-        st.subheader("Stock Valladolid")
-        stock_df = build_stock_table(bundle)
-        if stock_df.empty:
-            st.info("Todavia no hay datos de stock preparados para Valladolid.")
-        else:
-            st.dataframe(stock_df, use_container_width=True, hide_index=True)
         st.subheader("Pedidos cliente Douai")
         st.dataframe(pd.DataFrame(bundle.get("customer_orders_douai", [])), use_container_width=True, hide_index=True)
     with stock_right:
@@ -649,7 +870,24 @@ with tab_tower:
         else:
             st.plotly_chart(gantt_fig, use_container_width=True)
 
-with tab_arch:
+    lower_left, lower_right = st.columns([1.15, 0.85])
+    with lower_left:
+        st.subheader("Gantt de cobertura de stock vs ETA maritima")
+        stock_gantt = build_stock_rupture_gantt(bundle)
+        if stock_gantt is None:
+            st.info("Todavia no hay suficiente informacion para calcular ruptura de stock por ETA maritima.")
+        else:
+            st.plotly_chart(stock_gantt, use_container_width=True)
+
+    with lower_right:
+        st.subheader("Propuesta de contingencia aerea")
+        contingency_df = build_air_contingency_table(bundle)
+        if contingency_df.empty:
+            st.info("No hay referencias en rotura de stock con propuesta aerea disponible en este momento.")
+        else:
+            st.dataframe(contingency_df, use_container_width=True, hide_index=True)
+
+elif current_page == "3. Arquitectura en vivo":
     st.subheader("Arquitectura en vivo")
     for row in service_rows:
         cols = st.columns([2, 3, 2, 1, 1])
@@ -664,7 +902,7 @@ with tab_arch:
             st.code(compose_service_action(service_name, "stop"))
             st.rerun()
 
-with tab_ingesta:
+elif current_page == "4. KDD Fase I - Ingesta":
     st.subheader("NiFi + Kafka")
     ing_left, ing_right = st.columns([1, 1])
     with ing_left:
@@ -704,7 +942,7 @@ with tab_ingesta:
                 use_container_width=True,
             )
 
-with tab_spark:
+elif current_page == "5. KDD Fase II - Spark":
     st.subheader("Spark SQL + Streaming")
     sp_left, sp_right = st.columns([1, 1])
     with sp_left:
@@ -712,11 +950,11 @@ with tab_spark:
     with sp_right:
         st.dataframe(pd.DataFrame(bundle.get("fact_air_recovery_options", [])), use_container_width=True, hide_index=True)
 
-with tab_graph:
+elif current_page == "6. GraphFrames":
     st.subheader("GraphFrames y criticidad")
     st.dataframe(pd.DataFrame(bundle.get("graph_centrality", [])), use_container_width=True, hide_index=True)
 
-with tab_persist:
+elif current_page == "7. Persistencia":
     st.subheader("Persistencia Hive vs Cassandra")
     p_left, p_right = st.columns(2)
     with p_left:
@@ -736,7 +974,7 @@ with tab_persist:
         cass_df = pd.DataFrame(bundle.get("ships_latest", []))
         st.dataframe(cass_df[[c for c in cass_df.columns if c in ["ship_id", "route_id", "dest_port", "stock_on_hand", "eta_hours_estimate"]]], use_container_width=True, hide_index=True)
 
-with tab_airflow:
+elif current_page == "8. Orquestacion":
     st.subheader("Airflow y orquestación")
     airflow_df = pd.DataFrame(
         [
@@ -747,7 +985,7 @@ with tab_airflow:
     )
     st.dataframe(airflow_df, use_container_width=True, hide_index=True)
 
-with tab_evidence:
+elif current_page == "9. Evidencias KDD":
     st.subheader("Evidencias KDD")
     render_diagram("Flujo KDD", "pipeline general", flow_diagram_svg())
     render_diagram("Diagrama de Secuencia", "interaccion entre componentes", sequence_diagram_svg())
