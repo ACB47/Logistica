@@ -4,6 +4,7 @@ import json
 import subprocess
 from pathlib import Path
 from datetime import datetime, timedelta
+from math import isnan
 
 import pandas as pd
 import plotly.express as px
@@ -430,9 +431,9 @@ def build_service_badge(badge: str) -> str:
     }.get(badge, "off")
 
 
-def build_stock_table(bundle: dict) -> pd.DataFrame:
+def build_stock_table(bundle: dict, customer_city: str | None = None, industrial_week: str | None = None) -> pd.DataFrame:
     stock = pd.DataFrame(bundle.get("stock_valladolid", []))
-    orders = pd.DataFrame(bundle.get("customer_orders_douai", []))
+    orders = filter_orders(bundle, customer_city, industrial_week)
     if stock.empty:
         return stock
 
@@ -480,15 +481,24 @@ def build_stock_table(bundle: dict) -> pd.DataFrame:
             "Cantidad total embalajes",
             "Cantidad total piezas",
             "Stock minimo seguridad",
-            "Pedido cliente Douai (piezas)",
-            "Disponible tras pedido",
         ]
     ]
 
 
-def build_stock_context(bundle: dict) -> pd.DataFrame:
-    stock = pd.DataFrame(bundle.get("stock_valladolid", []))
+def filter_orders(bundle: dict, customer_city: str | None = None, industrial_week: str | None = None) -> pd.DataFrame:
     orders = pd.DataFrame(bundle.get("customer_orders_douai", []))
+    if orders.empty:
+        return orders
+    if customer_city and customer_city != "Todos":
+        orders = orders[orders["customer_city"] == customer_city]
+    if industrial_week:
+        orders = orders[orders["industrial_week"] == industrial_week]
+    return orders
+
+
+def build_stock_context(bundle: dict, customer_city: str | None = None, industrial_week: str | None = None) -> pd.DataFrame:
+    stock = pd.DataFrame(bundle.get("stock_valladolid", []))
+    orders = filter_orders(bundle, customer_city, industrial_week)
     if stock.empty:
         return stock
 
@@ -518,8 +528,8 @@ def build_stock_context(bundle: dict) -> pd.DataFrame:
     return stock
 
 
-def build_stock_bar_chart(bundle: dict):
-    stock_df = build_stock_table(bundle)
+def build_stock_bar_chart(bundle: dict, customer_city: str | None = None, industrial_week: str | None = None):
+    stock_df = build_stock_table(bundle, customer_city, industrial_week)
     if stock_df.empty:
         return None
 
@@ -541,13 +551,20 @@ def build_stock_bar_chart(bundle: dict):
         xaxis_title="Referencias",
         yaxis_title="Piezas en stock",
         legend_title="Semaforo stock",
+        xaxis={"type": "category", "categoryorder": "array", "categoryarray": stock_df["Referencia articulo"].tolist()},
+    )
+    fig.update_xaxes(
+        tickmode="array",
+        tickvals=stock_df["Referencia articulo"].tolist(),
+        ticktext=stock_df["Referencia articulo"].tolist(),
+        tickangle=-45,
     )
     fig.update_traces(textposition="outside")
     return fig
 
 
-def build_stock_rupture_gantt(bundle: dict):
-    stock = build_stock_context(bundle)
+def build_stock_rupture_gantt(bundle: dict, customer_city: str | None = None, industrial_week: str | None = None):
+    stock = build_stock_context(bundle, customer_city, industrial_week)
     air = pd.DataFrame(bundle.get("fact_air_recovery_options", []))
     if stock.empty:
         return None
@@ -614,43 +631,135 @@ def build_stock_rupture_gantt(bundle: dict):
     return fig
 
 
-def build_air_contingency_table(bundle: dict) -> pd.DataFrame:
-    stock = build_stock_context(bundle)
-    orders = pd.DataFrame(bundle.get("customer_orders_douai", []))
+def build_air_contingency_table(bundle: dict, customer_city: str | None = None, industrial_week: str | None = None) -> pd.DataFrame:
+    stock = build_stock_context(bundle, customer_city, industrial_week)
+    orders_cov = build_orders_coverage(bundle, customer_city)
     air = pd.DataFrame(bundle.get("fact_air_recovery_options", []))
-    if stock.empty or orders.empty or air.empty:
+    if stock.empty or orders_cov.empty or air.empty:
         return pd.DataFrame()
 
-    risk_stock = stock[stock["stock_status"] == "ROJO"].copy()
-    if risk_stock.empty:
+    if industrial_week:
+        orders_cov = orders_cov[orders_cov["industrial_week"] == industrial_week]
+
+    risk_orders = orders_cov[orders_cov["cover_status"] == "NO CUBRE"].copy()
+    if risk_orders.empty:
         return pd.DataFrame()
 
+    stock_lookup = stock.set_index("article_ref") if "article_ref" in stock.columns else pd.DataFrame()
     rows = []
-    now = datetime.now()
-    for _, row in risk_stock.iterrows():
-        order_match = orders[orders["article_ref"] == row["article_ref"]]
-        best_air = air[air["dest_port"] == row["inbound_port"]]
-        if order_match.empty or best_air.empty:
+    for _, order in risk_orders.iterrows():
+        article_ref = order["article_ref"]
+        if article_ref not in stock_lookup.index:
             continue
-        order = order_match.iloc[0]
+
+        stock_row = stock_lookup.loc[article_ref]
+        best_air = air[air["dest_port"] == stock_row["inbound_port"]]
+        if best_air.empty:
+            continue
+
         option = best_air.iloc[0]
-        arrival_dt = now + timedelta(hours=float(option["air_total_eta_hours"]))
         rows.append(
             {
-                "Referencia": row["article_ref"],
+                "Referencia": article_ref,
                 "Pedido": order["order_id"],
                 "Alternativa aerea": f"Shanghai -> {option['air_dest_city']} + camion Valladolid",
-                "Llegada Valladolid": arrival_dt.strftime("%Y-%m-%d %H:%M"),
+                "Llegada Valladolid": pd.to_datetime(order["arrival_valladolid"]).strftime("%Y-%m-%d %H:%M"),
                 "Sobre coste aereo (EUR)": round(float(option["air_total_cost_eur"]), 2),
+                "Cliente": order["customer_city"],
+                "Semana": order["industrial_week"],
+                "Cobertura": order["cover_status"],
             }
         )
     return pd.DataFrame(rows)
 
 
-def build_gantt(bundle: dict):
+def format_iw(date_value: pd.Timestamp) -> str:
+    week = int(date_value.isocalendar().week)
+    return f"IW{week:02d}"
+
+
+def build_orders_coverage(bundle: dict, customer_city: str | None = None) -> pd.DataFrame:
+    orders = filter_orders(bundle, customer_city, None)
+    stock = build_stock_context(bundle, customer_city, None)
+    air = pd.DataFrame(bundle.get("fact_air_recovery_options", []))
+    if orders.empty or stock.empty:
+        return pd.DataFrame()
+
+    stock_lookup = stock.set_index("article_ref") if "article_ref" in stock.columns else pd.DataFrame()
+    rows = []
+    now = datetime.now()
+    for _, order in orders.iterrows():
+        article_ref = order["article_ref"]
+        if article_ref not in stock_lookup.index:
+            continue
+        stock_row = stock_lookup.loc[article_ref]
+        best_option = air[air["dest_port"] == stock_row.get("inbound_port")]
+        ship_eta = float(best_option.iloc[0]["ship_remaining_hours"]) if not best_option.empty and pd.notna(best_option.iloc[0].get("ship_remaining_hours")) else 240.0
+        air_eta = float(best_option.iloc[0]["air_total_eta_hours"]) if not best_option.empty and pd.notna(best_option.iloc[0].get("air_total_eta_hours")) else ship_eta
+        warehouse_arrival = now + timedelta(hours=air_eta if stock_row["stock_status"] == "ROJO" else ship_eta)
+        need_date = pd.to_datetime(order["planned_delivery_date"])
+        margin_days = round((need_date - warehouse_arrival).total_seconds() / 86400, 1)
+        rows.append(
+            {
+                "order_id": order["order_id"],
+                "article_ref": article_ref,
+                "customer_city": order["customer_city"],
+                "industrial_week": order["industrial_week"],
+                "needed_date_client": need_date,
+                "arrival_valladolid": warehouse_arrival,
+                "margin_days": margin_days,
+                "cover_status": "CUBRE" if margin_days >= 4 else "NO CUBRE",
+                "recommended_mode": best_option.iloc[0]["recommended_mode"] if not best_option.empty else "MARITIMO",
+                "air_total_cost_eur": float(best_option.iloc[0]["air_total_cost_eur"]) if not best_option.empty else 0.0,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def build_stock_horizon(bundle: dict, customer_city: str | None = None) -> pd.DataFrame:
+    stock = build_stock_context(bundle, customer_city, None)
+    orders_cov = build_orders_coverage(bundle, customer_city)
+    raw_orders = filter_orders(bundle, customer_city, None)
+    if stock.empty:
+        return pd.DataFrame()
+
+    base_week = 14
+    weeks = [f"IW{week:02d}" for week in range(base_week, base_week + 10)]
+    rows = []
+    for _, stock_row in stock.iterrows():
+        projected_stock = int(stock_row["total_stock_pieces"])
+        for week in weeks:
+            week_orders = orders_cov[(orders_cov["article_ref"] == stock_row["article_ref"]) & (orders_cov["industrial_week"] == week)]
+            order_subset = raw_orders[(raw_orders["article_ref"] == stock_row["article_ref"]) & (raw_orders["industrial_week"] == week)]
+            outbound = int(order_subset["ordered_pieces"].sum()) if not order_subset.empty else 0
+            inbound = int(
+                week_orders[week_orders["arrival_valladolid"].apply(lambda d: format_iw(pd.Timestamp(d)) == week)]["article_ref"].count()
+                * stock_row["pieces_per_pack"]
+            )
+            projected_stock = projected_stock + inbound - outbound
+            cover_status = "NO CUBRE" if ((not week_orders.empty) and (week_orders["cover_status"] == "NO CUBRE").any()) else "CUBRE"
+            rows.append(
+                {
+                    "Referencia": stock_row["article_ref"],
+                    "Semana industrial": week,
+                    "Stock inicial": int(stock_row["total_stock_pieces"]),
+                    "Entrada semana": inbound,
+                    "Salida pedidos": outbound,
+                    "Stock proyectado": projected_stock,
+                    "CUBRE/NO CUBRE": cover_status,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def build_gantt(bundle: dict, industrial_week: str | None = None):
     gantt = pd.DataFrame(bundle.get("article_gantt", []))
     if gantt.empty:
         return None
+    if industrial_week:
+        gantt = gantt[gantt["industrial_week"] == industrial_week]
+        if gantt.empty:
+            return None
     gantt["start_date"] = pd.to_datetime(gantt["start_date"])
     gantt["end_date"] = pd.to_datetime(gantt["end_date"])
     fig = px.timeline(
@@ -751,8 +860,8 @@ with st.sidebar:
     st.slider("Factor de demanda", 80, 140, 100)
     st.slider("Retraso adicional ETA (h)", 0, 120, 48)
     st.toggle("Activar contingencia aerea", value=True)
-    st.selectbox("Semana industrial", ["IW14", "IW15", "IW16"], index=0)
-    st.selectbox("Cliente destino", ["Douai"], index=0)
+    selected_week = st.selectbox("Semana industrial", ["IW14", "IW15", "IW16", "IW17"], index=0)
+    selected_customer = st.selectbox("Cliente destino", ["Todos", "Douai", "Cleon"], index=0)
 
     st.markdown("#### 6. Ayuda rapida")
     st.markdown(
@@ -848,14 +957,14 @@ if current_page == "1. Resumen Ejecutivo":
 
 elif current_page == "2. Control Tower Valladolid":
     st.subheader("Stock Valladolid")
-    stock_df = build_stock_table(bundle)
+    stock_df = build_stock_table(bundle, selected_customer, selected_week)
     if stock_df.empty:
         st.info("Todavia no hay datos de stock preparados para Valladolid.")
     else:
         st.dataframe(stock_df, use_container_width=True, hide_index=True)
 
     st.subheader("Stock por referencia")
-    stock_fig = build_stock_bar_chart(bundle)
+    stock_fig = build_stock_bar_chart(bundle, selected_customer, selected_week)
     if stock_fig is None:
         st.info("Todavia no hay suficiente informacion para pintar el stock por referencia.")
     else:
@@ -863,13 +972,13 @@ elif current_page == "2. Control Tower Valladolid":
 
     stock_left, stock_right = st.columns([1.05, 0.95])
     with stock_left:
-        st.subheader("Pedidos cliente Douai")
-        st.dataframe(pd.DataFrame(bundle.get("customer_orders_douai", [])), use_container_width=True, hide_index=True)
+        st.subheader("Pedidos de cliente")
+        st.dataframe(filter_orders(bundle, selected_customer, selected_week), use_container_width=True, hide_index=True)
     with stock_right:
         st.subheader("Flota y ETA")
         st.dataframe(pd.DataFrame(bundle.get("ships_latest", [])), use_container_width=True, hide_index=True)
         st.subheader("Gantt por semanas industriales")
-        gantt_fig = build_gantt(bundle)
+        gantt_fig = build_gantt(bundle, selected_week)
         if gantt_fig is None:
             st.info("Todavia no hay tareas de planificacion para mostrar en el Gantt.")
         else:
@@ -878,15 +987,22 @@ elif current_page == "2. Control Tower Valladolid":
     lower_left, lower_right = st.columns([1.15, 0.85])
     with lower_left:
         st.subheader("Gantt de cobertura de stock vs ETA maritima")
-        stock_gantt = build_stock_rupture_gantt(bundle)
+        stock_gantt = build_stock_rupture_gantt(bundle, selected_customer, selected_week)
         if stock_gantt is None:
             st.info("Todavia no hay suficiente informacion para calcular ruptura de stock por ETA maritima.")
         else:
             st.plotly_chart(stock_gantt, use_container_width=True)
 
+        st.subheader("Horizonte de 10 semanas industriales")
+        horizon_df = build_stock_horizon(bundle, selected_customer)
+        if horizon_df.empty:
+            st.info("Todavia no hay datos para calcular el horizonte semanal de stock.")
+        else:
+            st.dataframe(horizon_df, use_container_width=True, hide_index=True)
+
     with lower_right:
         st.subheader("Propuesta de contingencia aerea")
-        contingency_df = build_air_contingency_table(bundle)
+        contingency_df = build_air_contingency_table(bundle, selected_customer, selected_week)
         if contingency_df.empty:
             st.info("No hay referencias en rotura de stock con propuesta aerea disponible en este momento.")
         else:

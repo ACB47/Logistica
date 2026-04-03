@@ -8,12 +8,16 @@ PORTS = [
     ("PORT-VLC", "Valencia", "ES", "Costa Mediterranea", 39.4580, -0.3170, "port"),
     ("PORT-BCN", "Barcelona", "ES", "Costa Mediterranea", 41.3520, 2.1730, "port"),
     ("PORT-SHA", "Shanghai", "CN", "Asia Pacifico", 31.2304, 121.4737, "origin_hub"),
+    ("PORT-YOK", "Yokohama", "JP", "Asia Pacifico", 35.4437, 139.6380, "origin_hub"),
 ]
 
 ROUTES = [
     ("route-shanghai-algeciras", "Shanghai", "Algeciras", "maritime", 391.54, 8.0),
     ("route-shanghai-valencia", "Shanghai", "Valencia", "maritime", 403.15, 8.0),
     ("route-shanghai-barcelona", "Shanghai", "Barcelona", "maritime", 413.60, 8.0),
+    ("route-yokohama-algeciras", "Yokohama", "Algeciras", "maritime", 402.25, 8.0),
+    ("route-yokohama-valencia", "Yokohama", "Valencia", "maritime", 410.75, 8.0),
+    ("route-yokohama-barcelona", "Yokohama", "Barcelona", "maritime", 420.10, 8.0),
 ]
 
 WAREHOUSES = [
@@ -48,6 +52,10 @@ CUSTOMER_ORDERS_DOUAI = [
     ("ORD-DOU-008", "1000008644", "Douai", "FR", "IW16", "2026-04-12", "2026-04-14", 2, 16, "sea_committed"),
     ("ORD-DOU-009", "1000009755", "Douai", "FR", "IW16", "2026-04-13", "2026-04-15", 5, 50, "sea_committed"),
     ("ORD-DOU-010", "1000010866", "Douai", "FR", "IW16", "2026-04-13", "2026-04-15", 1, 6, "risk_stock"),
+    ("ORD-CLE-011", "1000001023", "Cleon", "FR", "IW16", "2026-04-14", "2026-04-16", 4, 72, "sea_committed"),
+    ("ORD-CLE-012", "1000005311", "Cleon", "FR", "IW16", "2026-04-14", "2026-04-16", 3, 48, "risk_stock"),
+    ("ORD-CLE-013", "1000009755", "Cleon", "FR", "IW17", "2026-04-17", "2026-04-19", 6, 60, "sea_committed"),
+    ("ORD-CLE-014", "1000010866", "Cleon", "FR", "IW17", "2026-04-18", "2026-04-20", 2, 12, "risk_stock"),
 ]
 
 ARTICLE_GANTT = [
@@ -78,6 +86,7 @@ ARTICLE_GANTT = [
 
 AIRPORTS = [
     ("AIR-PVG", "Shanghai Pudong", "Shanghai", "CN", 31.1443, 121.8083, "origin_air_hub"),
+    ("AIR-HND", "Tokyo Haneda", "Yokohama", "JP", 35.5494, 139.7798, "origin_air_hub"),
     ("AIR-MAD", "Adolfo Suarez Madrid-Barajas", "Madrid", "ES", 40.4893, -3.5676, "destination_airport"),
     ("AIR-BCN", "Barcelona-El Prat", "Barcelona", "ES", 41.2974, 2.0833, "destination_airport"),
     ("AIR-VLC", "Valencia Airport", "Valencia", "ES", 39.4893, -0.4816, "destination_airport"),
@@ -87,6 +96,9 @@ AIR_RECOVERY_CORRIDORS = [
     ("AIRREC-PVG-MAD", "Shanghai Pudong", "Madrid", 17.0, 18400.0, 1.00, 225.0),
     ("AIRREC-PVG-BCN", "Shanghai Pudong", "Barcelona", 16.0, 17600.0, 0.95, 690.0),
     ("AIRREC-PVG-VLC", "Shanghai Pudong", "Valencia", 16.5, 17150.0, 0.93, 360.0),
+    ("AIRREC-HND-MAD", "Tokyo Haneda", "Madrid", 18.0, 19150.0, 1.03, 225.0),
+    ("AIRREC-HND-BCN", "Tokyo Haneda", "Barcelona", 17.0, 18300.0, 0.97, 690.0),
+    ("AIRREC-HND-VLC", "Tokyo Haneda", "Valencia", 17.5, 17850.0, 0.96, 360.0),
 ]
 
 
