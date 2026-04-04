@@ -12,12 +12,12 @@ PORTS = [
 ]
 
 ROUTES = [
-    ("route-shanghai-algeciras", "Shanghai", "Algeciras", "maritime", 391.54, 8.0),
-    ("route-shanghai-valencia", "Shanghai", "Valencia", "maritime", 403.15, 8.0),
-    ("route-shanghai-barcelona", "Shanghai", "Barcelona", "maritime", 413.60, 8.0),
-    ("route-yokohama-algeciras", "Yokohama", "Algeciras", "maritime", 402.25, 8.0),
-    ("route-yokohama-valencia", "Yokohama", "Valencia", "maritime", 410.75, 8.0),
-    ("route-yokohama-barcelona", "Yokohama", "Barcelona", "maritime", 420.10, 8.0),
+    ("route-shanghai-algeciras", "Shanghai", "Algeciras", "maritime", 391.54, 8.0, 4500.0),
+    ("route-shanghai-valencia", "Shanghai", "Valencia", "maritime", 403.15, 8.0, 4000.0),
+    ("route-shanghai-barcelona", "Shanghai", "Barcelona", "maritime", 413.60, 8.0, 3100.0),
+    ("route-yokohama-algeciras", "Yokohama", "Algeciras", "maritime", 402.25, 8.0, 6500.0),
+    ("route-yokohama-valencia", "Yokohama", "Valencia", "maritime", 410.75, 8.0, 6000.0),
+    ("route-yokohama-barcelona", "Yokohama", "Barcelona", "maritime", 420.10, 8.0, 5500.0),
 ]
 
 WAREHOUSES = [
@@ -120,7 +120,7 @@ def main() -> None:
     )
     dim_routes = spark.createDataFrame(
         ROUTES,
-        ["route_id", "origin_port", "dest_port", "route_mode", "sea_hours_estimate", "inland_hours_estimate"],
+        ["route_id", "origin_port", "dest_port", "route_mode", "sea_hours_estimate", "inland_hours_estimate", "maritime_cost_eur"],
     )
     dim_warehouse = spark.createDataFrame(
         WAREHOUSES,

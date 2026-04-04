@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from pyspark.sql import SparkSession, Window
-from pyspark.sql.functions import col, expr, row_number
+from pyspark.sql.functions import col, expr, row_number, round as sql_round
 
 
 def rows_to_dicts(dataframe, limit: int | None = None) -> list[dict]:
@@ -46,6 +46,7 @@ def main() -> None:
         "fact_alerts": [],
         "fact_weather_operational": [],
         "fact_air_recovery_options": [],
+        "air_routes": [],
         "graph_centrality": [],
         "dim_ports": [],
         "dim_routes": [],
@@ -65,17 +66,22 @@ def main() -> None:
 
     try:
         ships = spark.table("logistica.stg_ships")
+        dim_routes = spark.table("logistica.dim_routes").select("route_id", "sea_hours_estimate", "maritime_cost_eur")
         latest_window = Window.partitionBy("ship_id").orderBy(col("ts").desc())
         ships_latest = (
             ships.withColumn("row_num", row_number().over(latest_window))
             .filter(col("row_num") == 1)
             .drop("row_num")
+            .join(dim_routes, on="route_id", how="left")
             .withColumn(
                 "eta_hours_estimate",
                 expr(
                     "round((greatest(0.0, 405.0 - (stock_on_hand * 0.4))) + 12.0, 1)"
                 ),
             )
+            .withColumn("voyage_days_total", sql_round(col("sea_hours_estimate") / expr("24.0"), 1))
+            .withColumn("voyage_days_remaining", sql_round(col("eta_hours_estimate") / expr("24.0"), 1))
+            .withColumn("voyage_days_elapsed", sql_round(col("voyage_days_total") - col("voyage_days_remaining"), 1))
             .orderBy("ship_id")
         )
         payload["ships_latest"] = rows_to_dicts(ships_latest)
@@ -117,6 +123,31 @@ def main() -> None:
         payload["fact_air_recovery_options"] = rows_to_dicts(air_recovery, limit=20)
     except Exception as exc:  # pragma: no cover
         errors.append(f"fact_air_recovery_options: {exc}")
+
+    try:
+        dim_air_recovery = spark.table("logistica.dim_air_recovery")
+        dim_routes = spark.table("logistica.dim_routes").select("origin_port", "dest_port", "maritime_cost_eur")
+        air_routes = (
+            dim_air_recovery.join(
+                dim_routes,
+                (dim_air_recovery.dest_city == dim_routes.dest_port),
+                "left",
+            )
+            .select(
+                col("air_recovery_id"),
+                col("origin_airport"),
+                col("dest_city"),
+                col("air_eta_hours"),
+                col("air_cost_eur"),
+                col("truck_km_to_warehouse"),
+                col("maritime_cost_eur"),
+                sql_round(col("air_cost_eur") - col("maritime_cost_eur"), 2).alias("air_overcost_eur"),
+            )
+            .orderBy("origin_airport", "dest_city")
+        )
+        payload["air_routes"] = rows_to_dicts(air_routes)
+    except Exception as exc:  # pragma: no cover
+        errors.append(f"air_routes: {exc}")
 
     try:
         centrality = spark.table("logistica.fact_graph_centrality").orderBy(col("degree").desc(), col("node_id"))

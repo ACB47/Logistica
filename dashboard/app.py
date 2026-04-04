@@ -394,6 +394,10 @@ def enrich_ship_eta_dates(ships_df: pd.DataFrame) -> pd.DataFrame:
     ships_df["eta_fecha"] = ships_df["eta_hours_estimate"].apply(
         lambda hours: (base_now + timedelta(hours=float(hours))).strftime("%Y-%m-%d %H:%M") if pd.notna(hours) else "N/A"
     )
+    if "voyage_days_elapsed" in ships_df.columns:
+        ships_df["fecha_salida_origen"] = ships_df["voyage_days_elapsed"].apply(
+            lambda days: (base_now - timedelta(hours=float(days) * 24)).strftime("%Y-%m-%d %H:%M") if pd.notna(days) else "N/A"
+        )
     return ships_df
 
 
@@ -1157,7 +1161,7 @@ elif current_page == "4. KDD Fase I - Ingesta":
             st.info("Todavia no hay barcos en el bundle actual.")
         else:
             st.dataframe(
-                ship_table_df[[c for c in ship_table_df.columns if c in ["ship_id", "origin_port", "dest_port", "lat", "lon", "eta_fecha", "simulation_cover_status"]]],
+                ship_table_df[[c for c in ship_table_df.columns if c in ["ship_id", "origin_port", "dest_port", "fecha_salida_origen", "voyage_days_total", "eta_fecha", "simulation_cover_status"]]],
                 use_container_width=True,
                 hide_index=True,
             )

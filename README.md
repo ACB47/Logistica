@@ -243,7 +243,7 @@ Recomendación final esperada:
 - `MARITIMO` si la ruta sigue siendo viable y más barata
 - `AEREO_CAMION` si la alternativa aérea evita rotura de stock y mejora el ETA con un coste justificable
 
-El panel de barcos del dashboard también incorpora `ETA` por barco para visualizar de forma directa si la llegada prevista compromete el stock.
+El panel de barcos del dashboard también incorpora `ETA` por barco para visualizar de forma directa si la llegada prevista compromete el stock. Esa ETA se muestra en formato fecha/hora estimada de llegada, junto con la fecha de salida del puerto de origen y los días de viaje.
 
 Además, la demo permite:
 
@@ -260,6 +260,7 @@ El dashboard permite filtros y simulaciones en tiempo de demo:
 - semana industrial
 - barco concreto
 - incidencias activables por barco
+- visualización GPS de barcos desde `Shanghai` y `Yokohama`
 
 Con estos controles se recalculan:
 

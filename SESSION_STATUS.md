@@ -41,6 +41,7 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - Regla operativa confirmada: los `spark-submit` y `spark-sql` con Hive deben ejecutarse secuencialmente para evitar bloqueos de Derby en el metastore embebido.
 - Ya existe una ampliacion del dashboard para stock de Valladolid, pedidos de Douai y Gantt por semanas industriales apoyada en `dim_articles_valladolid`, `fact_customer_orders_douai` y `fact_article_gantt`.
 - El dashboard ya contempla dos clientes franceses (`Douai` y `Cleon`), dos orígenes asiáticos (`Shanghai` y `Yokohama`) y simulación de incidencias por barco con recálculo de ETA y `CUBRE / NO CUBRE`.
+- La pestaña de ingesta ya debe enseñar tabla de barcos con ETA en formato fecha, salida desde origen y visualización GPS sobre el corredor marítimo Asia -> España.
 - Punto exacto de reanudacion: el dashboard ya carga, pero las tablas `dim_articles_valladolid`, `fact_customer_orders_douai` y `fact_article_gantt` no aparecen todavia en Hive en este arranque; al volver hay que ejecutar `spark-submit jobs/spark/01_load_master_dimensions.py`, despues `spark-submit jobs/spark/99_dashboard_bundle.py` y refrescar la UI.
 - El bundle del dashboard ya incorpora `eta_hours_estimate` por barco para conectar ETA con riesgo de stock y decisiones de contingencia.
 - Lo mas importante pendiente ahora es cerrar evidencias, Airflow visual, narrativa final de defensa y documentacion completa sobre la ruta Docker/local.

@@ -371,7 +371,7 @@ Para planificación visual, también se modela un Gantt por semanas industriales
 
 Esto permite exponer no solo el estado actual del stock, sino también la secuencia logística prevista de cada artículo.
 
-Además, el panel de flota debe mostrar `ETA` por barco para poder enlazar visualmente la llegada estimada con el riesgo de ruptura de stock.
+Además, el panel de flota debe mostrar `ETA` por barco para poder enlazar visualmente la llegada estimada con el riesgo de ruptura de stock. Esa ETA debe visualizarse en formato fecha/hora y, junto a ella, la fecha de salida del puerto de origen y los días de viaje previstos.
 
 El dashboard permite además:
 
@@ -381,6 +381,11 @@ El dashboard permite además:
 - activar incidencias simuladas sobre ese barco
 
 Con esos controles, la interfaz recalcula si la llegada sigue `CUBRIENDO` o `NO CUBRIENDO` el stock.
+
+Tambien debe visualizarse la salida de barcos desde dos puertos asiaticos:
+
+- Shanghai
+- Yokohama
 
 ---
 
