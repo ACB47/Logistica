@@ -814,14 +814,18 @@ def build_stock_horizon(bundle: dict, customer_city: str | None = None) -> pd.Da
     rows = []
     for _, stock_row in stock.iterrows():
         projected_stock = int(stock_row["total_stock_pieces"])
+        safety_stock = int(stock_row["safety_stock_min"])
+        daily_cons = int(stock_row["daily_consumption_avg"])
+        weekly_consumption = daily_cons * 7
+
         for week in weeks:
             week_orders = orders_cov[(orders_cov["article_ref"] == stock_row["article_ref"]) & (orders_cov["industrial_week"] == week)]
             order_subset = raw_orders[(raw_orders["article_ref"] == stock_row["article_ref"]) & (raw_orders["industrial_week"] == week)]
-            outbound = int(order_subset["ordered_pieces"].sum()) if not order_subset.empty else 0
+            outbound = int(order_subset["ordered_pieces"].sum()) if not order_subset.empty else weekly_consumption
             arrival_matches = week_orders[week_orders["arrival_valladolid"].apply(lambda d: format_iw(pd.Timestamp(d)) == week)] if not week_orders.empty else week_orders
             inbound = int(len(arrival_matches.index) * stock_row["pieces_per_pack"])
-            projected_stock = projected_stock + inbound - outbound
-            cover_status = "NO CUBRE" if ((not week_orders.empty) and (week_orders["cover_status"] == "NO CUBRE").any()) else "CUBRE"
+            projected_stock = max(0, projected_stock + inbound - outbound)
+            cover_status = "NO CUBRE" if projected_stock <= safety_stock else ("ALERTA" if projected_stock <= safety_stock + weekly_consumption else "CUBRE")
             rows.append(
                 {
                     "Referencia": stock_row["article_ref"],
@@ -834,6 +838,104 @@ def build_stock_horizon(bundle: dict, customer_city: str | None = None) -> pd.Da
                 }
             )
     return pd.DataFrame(rows)
+
+
+def render_stock_horizon_table(bundle: dict, customer_city: str | None = None) -> None:
+    from datetime import datetime as _dt
+    stock = build_stock_context(bundle, customer_city, None)
+    if stock.empty:
+        st.info("Todavia no hay datos para calcular el horizonte semanal de stock.")
+        return
+
+    weeks = [f"IW{week:02d}" for week in range(14, 24)]
+    horizon_df = build_stock_horizon(bundle, customer_city)
+
+    stock_lookup = stock.set_index("article_ref")
+    today_str = _dt.now().strftime("%d/%m/%Y")
+    rows_html = []
+    for article_ref in stock_lookup.index:
+        article = stock_lookup.loc[article_ref]
+        safety_stock = int(article["safety_stock_min"])
+        daily_cons = int(article["daily_consumption_avg"])
+        alert_threshold = safety_stock + (daily_cons * 7)
+
+        week_cells = []
+        worst_status = "CUBRE"
+        for week in weeks:
+            week_row = horizon_df[(horizon_df["Referencia"] == article_ref) & (horizon_df["Semana industrial"] == week)]
+            if week_row.empty:
+                pieces = max(0, int(article["total_stock_pieces"]))
+            else:
+                pieces = max(0, int(week_row.iloc[0]["Stock proyectado"]))
+
+            if pieces <= safety_stock:
+                status = "NO CUBRE"
+                color = "#dc2626"
+                icon = "✈"
+                if worst_status == "CUBRE":
+                    worst_status = "NO CUBRE"
+            elif pieces <= alert_threshold:
+                status = "ALERTA"
+                color = "#f59e0b"
+                icon = "✈"
+                if worst_status == "CUBRE":
+                    worst_status = "ALERTA"
+            else:
+                status = "CUBRE"
+                color = "#16a34a"
+                icon = "🚢"
+
+            week_cells.append(
+                f"<td style='text-align:center; min-width:88px; padding:8px 6px; background:#fff; border-radius:8px;'>"
+                f"<div style='font-weight:800; font-size:1.1rem; color:#10233f'>{pieces}</div>"
+                f"<div style='font-size:0.72rem; font-weight:700; color:{color}; margin-top:2px;'>{status}</div>"
+                f"<div style='font-size:1.15rem; margin-top:2px;'>{icon}</div>"
+                f"</td>"
+            )
+
+        transport_icon = "✈" if worst_status != "CUBRE" else "🚢"
+        transport_color = "#dc2626" if worst_status == "NO CUBRE" else ("#f59e0b" if worst_status == "ALERTA" else "#16a34a")
+        transport_label = "Aereo" if worst_status != "CUBRE" else "Maritimo"
+
+        mode_cell = (
+            f"<td style='text-align:center; min-width:80px; padding:8px 6px; background:#fff; border-radius:8px;'>"
+            f"<div style='font-size:1.6rem;'>{transport_icon}</div>"
+            f"<div style='font-size:0.72rem; font-weight:700; color:{transport_color}; margin-top:2px;'>{transport_label}</div>"
+            f"</td>"
+        )
+
+        ref_cell = f"<td style='font-weight:700; padding:8px 10px; white-space:nowrap;'>{article_ref}</td>"
+        rows_html.append(f"<tr>{ref_cell}{''.join(week_cells)}{mode_cell}</tr>")
+
+    headers = (
+        f"<th style='padding:10px 12px; text-align:left;'>Referencia</th>"
+        + "".join([f"<th style='padding:10px 8px;'>{week}</th>" for week in weeks])
+        + f"<th style='padding:10px 12px;'>Tipo de envio</th>"
+    )
+    html = f"""
+    <div style='width:100%;'>
+      <div class='card' style='padding:14px 16px; width:100%;'>
+        <div class='card-title'>horizonte de stock</div>
+        <h3 style='margin:0.15rem 0 0.6rem 0; color:#10233f; font-size:1.25rem;'>Cobertura por semanas industriales</h3>
+        <div style='overflow-x:auto; width:100%;'>
+          <table style='width:100%; min-width:1200px; border-collapse:separate; border-spacing:0 6px; font-family:Inter,sans-serif;'>
+            <thead>
+              <tr style='background:rgba(15,76,129,0.07); color:#0f4c81;'>{headers}</tr>
+            </thead>
+            <tbody>
+              {''.join(rows_html)}
+            </tbody>
+          </table>
+        </div>
+        <div style='margin-top:12px; display:flex; gap:18px; color:#475569; font-size:0.85rem;'>
+          <span>🚢 <b style='color:#16a34a'>CUBRE</b> = stock suficiente (maritimo)</span>
+          <span>✈ <b style='color:#f59e0b'>ALERTA</b> = preparar envio aereo</span>
+          <span>✈ <b style='color:#dc2626'>NO CUBRE</b> = activar contingencia aerea</span>
+        </div>
+      </div>
+    </div>
+    """
+    components.html(html, height=580, scrolling=True)
 
 
 def build_gantt(bundle: dict, industrial_week: str | None = None):
@@ -1082,13 +1184,7 @@ elif current_page == "2. Control Tower Valladolid":
             st.plotly_chart(stock_gantt, use_container_width=True)
 
         st.subheader("Horizonte de 10 semanas industriales")
-        horizon_df = build_stock_horizon(bundle, selected_customer)
-        if horizon_df.empty:
-            st.info("Todavia no hay datos para calcular el horizonte semanal de stock.")
-        else:
-            if week_filter:
-                horizon_df = horizon_df[horizon_df["Semana industrial"] == week_filter]
-            st.dataframe(horizon_df, use_container_width=True, hide_index=True)
+        render_stock_horizon_table(bundle, selected_customer)
 
     with lower_right:
         st.subheader("Propuesta de contingencia aerea")
