@@ -3,8 +3,8 @@
 Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el repo.
 
 ## Ultima actualizacion
-- Fecha de referencia: 2026-03-25
-- Contexto: se reviso el enunciado de `Proyecto Big Data.pdf`, se creo `TODO.md`, se ajusto `AGENTS.md`, se empezo la alineacion del stack con la rubrica y se anadio un script para arrancar/parar Docker por perfiles.
+- Fecha de referencia: 2026-04-05
+- Contexto: se redisenio la pestaña `Control Tower` y la pestaña `KDD Fase I - Ingesta` del dashboard Streamlit, con foco en horizonte de 10 semanas, mapa operacional y tabla de ETA.
 
 ## Resumen ejecutivo
 - El proyecto ya tiene una base funcional de demo: productores Kafka, landing raw en HDFS, jobs Spark batch, tablas Hive, soporte Cassandra, notebooks Zeppelin y un DAG de Airflow.
@@ -36,13 +36,14 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - `datos_filtrados_ok` ya queda incluido en la inicializacion automatica de Kafka para evitar fallos del rebuild tras reinicios.
 - El rebuild completo ya queda validado de nuevo: `fact_alerts` y el resto de tablas principales reaparecen correctamente tras `scripts/66_rebuild_hive_demo_tables.sh`.
 - Ya existe una base de dashboard en `Streamlit` con mapa, diagramas, estado de servicios y tablas clave para la defensa.
+- La pestaña `KDD Fase I - Ingesta` ya se rearmo para mostrar un mapa operacional de barcos en transito, rutas, puertos y una tabla de ETA con ETA original, ETA recalculada, coste maritimo e icono aereo.
 - Ya existe en codigo un nuevo caso de uso de contingencia: comparacion `barco vs aereo+camion` hasta Valladolid mediante `jobs/spark/03_air_recovery_options.py`.
 - `logistica.fact_air_recovery_options` ya fue generada y consultada con un caso valido de comparacion `barco vs aereo+camion`.
 - Regla operativa confirmada: los `spark-submit` y `spark-sql` con Hive deben ejecutarse secuencialmente para evitar bloqueos de Derby en el metastore embebido.
 - Ya existe una ampliacion del dashboard para stock de Valladolid, pedidos de Douai y Gantt por semanas industriales apoyada en `dim_articles_valladolid`, `fact_customer_orders_douai` y `fact_article_gantt`.
 - El dashboard ya contempla dos clientes franceses (`Douai` y `Cleon`), dos orígenes asiáticos (`Shanghai` y `Yokohama`) y simulación de incidencias por barco con recálculo de ETA y `CUBRE / NO CUBRE`.
 - La pestaña de ingesta ya debe enseñar tabla de barcos con ETA en formato fecha, salida desde origen y visualización GPS sobre el corredor marítimo Asia -> España.
-- Punto exacto de reanudacion: el dashboard ya carga, pero las tablas `dim_articles_valladolid`, `fact_customer_orders_douai` y `fact_article_gantt` no aparecen todavia en Hive en este arranque; al volver hay que ejecutar `spark-submit jobs/spark/01_load_master_dimensions.py`, despues `spark-submit jobs/spark/99_dashboard_bundle.py` y refrescar la UI.
+- Punto exacto de reanudacion: al volver hay que refrescar el bundle del dashboard con `spark-submit jobs/spark/99_dashboard_bundle.py` y comprobar que el mapa operacional y la tabla de ETA cargan con los filtros de destino/barco.
 - El bundle del dashboard ya incorpora `eta_hours_estimate` por barco para conectar ETA con riesgo de stock y decisiones de contingencia.
 - Lo mas importante pendiente ahora es cerrar evidencias, Airflow visual, narrativa final de defensa y documentacion completa sobre la ruta Docker/local.
 

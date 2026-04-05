@@ -377,6 +377,126 @@ def build_map_data(bundle: dict) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFra
     return ports, routes, ships, alerts
 
 
+def build_operational_ship_map(
+    bundle: dict,
+    selected_ship: str | None = None,
+    selected_dest: str | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    ports, routes, ships, alerts = build_map_data(bundle)
+    if ships.empty:
+        return ports, routes, ships, alerts, ships
+
+    ships_map = ships.copy()
+    if selected_ship and selected_ship != "Todos" and "ship_id" in ships_map.columns:
+        ships_map = ships_map[ships_map["ship_id"] == selected_ship]
+    if selected_dest and selected_dest != "Todos" and "dest_port" in ships_map.columns:
+        ships_map = ships_map[ships_map["dest_port"] == selected_dest]
+
+    if not ports.empty and {"port_name", "lat", "lon"}.issubset(ports.columns):
+        origin_lookup = ports[["port_name", "lat", "lon"]].rename(
+            columns={"port_name": "origin_port", "lat": "origin_lat", "lon": "origin_lon"}
+        )
+        dest_lookup = ports[["port_name", "lat", "lon"]].rename(
+            columns={"port_name": "dest_port", "lat": "dest_lat", "lon": "dest_lon"}
+        )
+        ships_map = ships_map.merge(origin_lookup, on="origin_port", how="left")
+        ships_map = ships_map.merge(dest_lookup, on="dest_port", how="left")
+
+        if {"lat", "lon", "origin_lat", "origin_lon", "dest_lat", "dest_lon"}.issubset(ships_map.columns):
+            ships_map["distance_to_origin"] = (
+                (ships_map["lat"] - ships_map["origin_lat"]).abs()
+                + (ships_map["lon"] - ships_map["origin_lon"]).abs()
+            )
+            ships_map["distance_to_dest"] = (
+                (ships_map["lat"] - ships_map["dest_lat"]).abs()
+                + (ships_map["lon"] - ships_map["dest_lon"]).abs()
+            )
+            # Solo barcos en tránsito: fuera de la zona de origen y de llegada.
+            ships_map = ships_map[(ships_map["distance_to_origin"] > 0.35) & (ships_map["distance_to_dest"] > 0.35)]
+
+    if "severity" not in routes.columns:
+        routes["severity"] = 1
+    else:
+        routes["severity"] = routes["severity"].fillna(1)
+
+    if not routes.empty and {"severity"}.issubset(routes.columns):
+        routes["color"] = routes["severity"].apply(
+            lambda sev: [220, 38, 38] if sev >= 4 else [245, 158, 11] if sev >= 3 else [37, 99, 235]
+        )
+
+    return ports, routes, ships, alerts, ships_map
+
+
+def build_ship_eta_table(
+    bundle: dict,
+    selected_ship: str | None = None,
+    selected_dest: str | None = None,
+    active_constraints: list[str] | None = None,
+) -> pd.DataFrame:
+    ships = pd.DataFrame(bundle.get("ships_latest", []))
+    if ships.empty:
+        return ships
+
+    if selected_ship and selected_ship != "Todos" and "ship_id" in ships.columns:
+        ships = ships[ships["ship_id"] == selected_ship]
+    if selected_dest and selected_dest != "Todos" and "dest_port" in ships.columns:
+        ships = ships[ships["dest_port"] == selected_dest]
+
+    if ships.empty:
+        return ships
+
+    weather = pd.DataFrame(bundle.get("fact_weather_operational", []))
+    air = pd.DataFrame(bundle.get("fact_air_recovery_options", []))
+    active_constraints = active_constraints or []
+    extra_hours = float(sum(SHIP_CONSTRAINTS[name] for name in active_constraints))
+    now = datetime.now()
+
+    weather_port_col = next((col_name for col_name in ["port_ref", "via_port", "dest_port"] if col_name in weather.columns), None)
+    weather_lookup: dict[str, float] = {}
+    if not weather.empty and weather_port_col and "weather_delay_hours_estimate" in weather.columns:
+        weather_sorted = weather
+        if "event_ts" in weather.columns:
+            weather_sorted = weather.sort_values("event_ts", ascending=False)
+        for port_name, group in weather_sorted.groupby(weather_port_col):
+            delay = group.iloc[0].get("weather_delay_hours_estimate", 0)
+            weather_lookup[str(port_name)] = float(delay or 0)
+
+    air_lookup: dict[str, dict[str, object]] = {}
+    if not air.empty and "ship_id" in air.columns:
+        air_value_cols = [col_name for col_name in ["recommended_mode", "stock_break_risk", "air_total_eta_hours", "air_total_cost_eur", "time_saved_hours"] if col_name in air.columns]
+        if air_value_cols:
+            air_best = air.sort_values("time_saved_hours", ascending=False) if "time_saved_hours" in air.columns else air
+            air_best = air_best.drop_duplicates("ship_id", keep="first")
+            air_lookup = air_best.set_index("ship_id")[air_value_cols].to_dict(orient="index")
+
+    rows: list[dict[str, object]] = []
+    for _, row in ships.iterrows():
+        base_raw = row.get("eta_hours_estimate", 0.0)
+        base_hours = float(base_raw) if pd.notna(base_raw) else 0.0
+        weather_delay = float(weather_lookup.get(str(row.get("dest_port")), 0.0))
+        recalculated_hours = max(0.0, base_hours + extra_hours + weather_delay)
+        ship_id = str(row.get("ship_id", ""))
+        air_info = air_lookup.get(ship_id, {})
+        needs_air = air_info.get("recommended_mode") == "AEREO_CAMION" or air_info.get("stock_break_risk") not in (None, "COBERTURA_OK")
+        maritime_raw = row.get("maritime_cost_eur", 0.0)
+        maritime_cost = float(maritime_raw) if pd.notna(maritime_raw) else 0.0
+
+        rows.append(
+            {
+                "Barco": ship_id,
+                "Origen": row.get("origin_port", "N/A"),
+                "Destino": row.get("dest_port", "N/A"),
+                "ETA Original": (now + timedelta(hours=base_hours)).strftime("%Y-%m-%d %H:%M"),
+                "ETA Recalculada": (now + timedelta(hours=recalculated_hours)).strftime("%Y-%m-%d %H:%M"),
+                "Coste Maritimo (EUR)": maritime_cost,
+                "Icono Aereo": "✈️" if needs_air else "🚢",
+                "Estado": "Riesgo de rotura" if needs_air else "Cobertura OK",
+            }
+        )
+
+    return pd.DataFrame(rows)
+
+
 def summarize_risk(bundle: dict) -> tuple[int, int, float]:
     alerts = pd.DataFrame(bundle.get("fact_alerts", []))
     weather = pd.DataFrame(bundle.get("fact_weather_operational", []))
@@ -1222,148 +1342,129 @@ elif current_page == "3. Arquitectura en vivo":
 
 elif current_page == "4. KDD Fase I - Ingesta":
     st.subheader("NiFi + Kafka")
-    ing_left, ing_right = st.columns([0.8, 1.2])
-    with ing_left:
-        render_panel(
-            "Ingesta Robusta y Decisión",
-            "fase I",
-            "Monitorización de flota en tiempo real. La activación de incidentes manuales o alertas meteorológicas automáticas recalcula el ETA y el riesgo de stock.",
-            height=200,
-        )
-        kafka_topics = pd.DataFrame(
-            [
-                ["datos_crudos", "raw"],
-                ["datos_filtrados", "filtered"],
-                ["alertas_globales", "alerts"],
-            ],
-            columns=["Topic", "Uso"],
-        )
-        st.dataframe(kafka_topics, use_container_width=True, hide_index=True)
-    with ing_right:
-        ports_df, routes_df, ships_df, alerts_df = build_map_data(bundle)
-        
-        # Capa de alertas por puerto
-        layers = []
-        if not ports_df.empty:
-            # Unir puertos con alertas si existen
-            ports_alerts = ports_df.copy()
-            if not alerts_df.empty:
-                ports_alerts = ports_alerts.merge(alerts_df[["via_port", "severity", "risk_level"]], left_on="port_name", right_on="via_port", how="left")
-                ports_alerts["severity"] = ports_alerts["severity"].fillna(1)
-            else:
-                ports_alerts["severity"] = 1
-            
-            ports_alerts["fill_color"] = ports_alerts["severity"].apply(
-                lambda sev: [220, 38, 38, 160] if sev >= 4 else [245, 158, 11, 160] if sev >= 3 else [34, 197, 94, 160]
-            )
-            layers.append(pdk.Layer("ScatterplotLayer", data=ports_alerts, get_position="[lon, lat]", get_radius=50000, get_fill_color="fill_color", pickable=True))
+    st.caption("Mapa operacional con puertos, rutas y barcos en tránsito. Los filtros limitan la vista a destinos y barcos concretos.")
 
-        # Capa de rutas
-        if not routes_df.empty:
-            layers.append(pdk.Layer("LineLayer", data=routes_df, get_source_position="[origin_lon, origin_lat]", get_target_position="[dest_lon, dest_lat]", get_color="color", get_width=3, pickable=True))
+    ship_options = ["Todos"]
+    ships_df = pd.DataFrame(bundle.get("ships_latest", []))
+    if not ships_df.empty and "ship_id" in ships_df.columns:
+        ship_options.extend(sorted(ships_df["ship_id"].dropna().astype(str).tolist()))
 
-        # Capa de barcos (GPS)
-        ship_options = ["Todos"]
-        if not ships_df.empty and "ship_id" in ships_df.columns:
-            ship_options.extend(sorted(ships_df["ship_id"].dropna().tolist()))
-        selected_ship = st.selectbox("Filtrar por barco", ship_options, index=0, key="ingesta_selected_ship")
-        
-        # Filtro por destino
-        dest_options = ["Todos", "Algeciras", "Valencia", "Barcelona"]
-        selected_dest = st.selectbox("Filtrar por puerto destino", dest_options, index=0)
+    filter_cols = st.columns([1, 1, 1, 1])
+    with filter_cols[0]:
+        selected_ship = st.selectbox("Barco", ship_options, index=0, key="ingesta_selected_ship")
+    with filter_cols[1]:
+        selected_dest = st.selectbox("Destino", ["Todos", "Algeciras", "Valencia", "Barcelona"], index=0, key="ingesta_selected_dest")
+    with filter_cols[2]:
+        st.markdown("#### Incidencias manuales")
+    with filter_cols[3]:
+        st.caption("ETA original + meteo + incidencias")
 
-        if not ships_df.empty:
-            ships_map_df = ships_df.copy()
-            if selected_ship != "Todos":
-                ships_map_df = ships_map_df[ships_map_df["ship_id"] == selected_ship]
-            if selected_dest != "Todos":
-                ships_map_df = ships_map_df[ships_map_df["dest_port"] == selected_dest]
-            
-            ships_map_df = enrich_ship_eta_dates(ships_map_df)
-            # Corregido: Asignar color como una lista de listas para que coincida con la longitud del DataFrame
-            ships_map_df["fill_color"] = [[37, 99, 235]] * len(ships_map_df)
-            
-            layers.append(pdk.Layer("ScatterplotLayer", data=ships_map_df, get_position="[lon, lat]", get_radius=35000, get_fill_color="[255, 255, 255]", get_line_color="[0, 0, 0]", line_width_min_pixels=2, pickable=True))
-            layers.append(pdk.Layer("ScatterplotLayer", data=ships_map_df, get_position="[lon, lat]", get_radius=20000, get_fill_color="[37, 99, 235]", pickable=True))
-
-        st.pydeck_chart(
-            pdk.Deck(
-                map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-                initial_view_state=pdk.ViewState(latitude=20.0, longitude=60.0, zoom=1.2, pitch=0),
-                layers=layers,
-                tooltip={"text": "Entidad: {port_name}{ship_id}\nEstado: {risk_level}"},
-            ),
-            use_container_width=True,
-        )
-
-    st.subheader("Alertas y decisiones operativas")
-    
-    # Pre-calculo de simulacion e incidencias
+    active_constraints: list[str] = []
     risk_cols = st.columns(6)
-    active_constraints = []
     for idx, label in enumerate(SHIP_CONSTRAINTS.keys()):
         with risk_cols[idx]:
             if st.toggle(label, value=False, key=f"risk_toggle_{label}"):
                 active_constraints.append(label)
 
-    # Tabla de barcos y decisiones
-    ships_table_df = ships_df.copy() if not ships_df.empty else pd.DataFrame()
-    if not ships_table_df.empty:
-        # Añadir coste maritimo ficticio/base
-        ships_table_df["Coste Maritimo (EUR)"] = 15000.0
-        
-        # Columnas de ETA
-        ships_table_df["ETA Original"] = ships_table_df["eta_hours_estimate"].apply(
-            lambda h: (datetime.now() + timedelta(hours=float(h))).strftime("%Y-%m-%d %H:%M") if pd.notna(h) else "N/A"
-        )
-        
-        # Recalcular ETA con incidencias
-        extra_h = sum(SHIP_CONSTRAINTS[c] for c in active_constraints)
-        # Tambien sumamos el retraso meteo del API si existe en fact_weather_operational
-        weather_df = pd.DataFrame(bundle.get("fact_weather_operational", []))
-        
-        def get_final_eta(row):
-            base_h = float(row["eta_hours_estimate"])
-            # Buscar retraso meteo para el puerto destino
-            w_delay = 0
-            if not weather_df.empty:
-                match = weather_df[weather_df["via_port"] == row["dest_port"]]
-                if not match.empty:
-                    w_delay = float(match.iloc[0].get("weather_delay_hours_estimate", 0))
-            
-            total_h = base_h + extra_h + w_delay
-            return (datetime.now() + timedelta(hours=total_h)).strftime("%Y-%m-%d %H:%M"), total_h
+    ports_df, routes_df, ships_all_df, alerts_df, ships_map_df = build_operational_ship_map(
+        bundle,
+        selected_ship=None if selected_ship == "Todos" else selected_ship,
+        selected_dest=None if selected_dest == "Todos" else selected_dest,
+    )
+    eta_table_df = build_ship_eta_table(
+        bundle,
+        selected_ship=None if selected_ship == "Todos" else selected_ship,
+        selected_dest=None if selected_dest == "Todos" else selected_dest,
+        active_constraints=active_constraints,
+    )
 
-        ships_table_df[["ETA Recalculada", "total_hours"]] = ships_table_df.apply(
-            lambda r: pd.Series(get_final_eta(r)), axis=1
-        )
-        
-        # Lógica de riesgo de ruptura e icono de avión
-        stock_context = build_stock_context(bundle)
-        def get_contingency(row):
-            # Si el barco va a Valladolid (vía Santander/Bilbao/etc)
-            # Simplificamos: si total_hours > stock_out_hours -> Avion
-            # Buscamos la referencia que trae este barco (asumimos 1 ref por barco para la demo o la media)
-            if stock_context.empty: return "🚢"
-            
-            # Simulamos chequeo contra horas hasta stockout (usamos 120h como umbral de seguridad si no hay datos)
-            limit_h = 120.0
-            if row["total_hours"] > limit_h:
-                return "✈️ ACTIVAR AEREO"
-            return "🚢 OK"
+    map_col, table_col = st.columns([1, 1])
+    with map_col:
+        st.subheader("Mapa operacional")
+        layers = []
+        if not ports_df.empty and {"port_name", "lat", "lon"}.issubset(ports_df.columns):
+            ports_layer = ports_df.copy()
+            if not alerts_df.empty and "via_port" in alerts_df.columns:
+                ports_layer = ports_layer.merge(
+                    alerts_df[["via_port", "severity", "risk_level"]],
+                    left_on="port_name",
+                    right_on="via_port",
+                    how="left",
+                )
+                ports_layer["severity"] = ports_layer["severity"].fillna(1)
+            else:
+                ports_layer["severity"] = 1
+            ports_layer["fill_color"] = ports_layer["severity"].apply(
+                lambda sev: [220, 38, 38, 180] if sev >= 4 else [245, 158, 11, 180] if sev >= 3 else [34, 197, 94, 180]
+            )
+            layers.append(
+                pdk.Layer(
+                    "ScatterplotLayer",
+                    data=ports_layer,
+                    get_position="[lon, lat]",
+                    get_radius=38000,
+                    get_fill_color="fill_color",
+                    pickable=True,
+                )
+            )
 
-        ships_table_df["Contingencia"] = ships_table_df.apply(get_contingency, axis=1)
-        
-        st.dataframe(
-            ships_table_df[["ship_id", "origin_port", "dest_port", "ETA Original", "ETA Recalculada", "Coste Maritimo (EUR)", "Contingencia"]].rename(
-                columns={"ship_id": "Barco", "origin_port": "Origen", "dest_port": "Destino"}
-            ),
-            use_container_width=True,
-            hide_index=True
-        )
+        if not routes_df.empty and {"origin_lat", "origin_lon", "dest_lat", "dest_lon"}.issubset(routes_df.columns):
+            layers.append(
+                pdk.Layer(
+                    "LineLayer",
+                    data=routes_df,
+                    get_source_position="[origin_lon, origin_lat]",
+                    get_target_position="[dest_lon, dest_lat]",
+                    get_color="color",
+                    get_width=3,
+                    pickable=True,
+                )
+            )
 
-    # Eliminar bloques antiguos de la sección Ingesta que ya no encajan
-    # (El código original continuaba con el mapa antiguo y simulación individual)
+        if not ships_map_df.empty and {"lat", "lon"}.issubset(ships_map_df.columns):
+            ships_map_df = ships_map_df.copy()
+            ships_map_df["tooltip_text"] = ships_map_df.apply(
+                lambda row: (
+                    f"Barco: {row.get('ship_id', '')}\nOrigen: {row.get('origin_port', '')}\n"
+                    f"Destino: {row.get('dest_port', '')}\nETA: {row.get('eta_hours_estimate', 'N/A')} h"
+                ),
+                axis=1,
+            )
+            ships_map_df["fill_color"] = [[37, 99, 235, 220]] * len(ships_map_df)
+            layers.append(
+                pdk.Layer(
+                    "ScatterplotLayer",
+                    data=ships_map_df,
+                    get_position="[lon, lat]",
+                    get_radius=26000,
+                    get_fill_color="fill_color",
+                    pickable=True,
+                )
+            )
+
+        if layers:
+            st.pydeck_chart(
+                pdk.Deck(
+                    map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+                    initial_view_state=pdk.ViewState(latitude=32.0, longitude=20.0, zoom=1.35, pitch=0),
+                    layers=layers,
+                    tooltip={"text": "{tooltip_text}"},
+                ),
+                use_container_width=True,
+            )
+        else:
+            st.info("No hay datos geográficos disponibles para el mapa operacional.")
+
+    with table_col:
+        st.subheader("Tabla de Barcos y ETA")
+        if eta_table_df.empty:
+            st.info("No hay barcos disponibles para mostrar la tabla de ETA.")
+        else:
+            st.dataframe(
+                eta_table_df[["Barco", "Origen", "Destino", "ETA Original", "ETA Recalculada", "Coste Maritimo (EUR)", "Icono Aereo", "Estado"]],
+                use_container_width=True,
+                hide_index=True,
+            )
 
 elif current_page == "5. KDD Fase II - Spark":
     st.subheader("Spark SQL + Streaming")
