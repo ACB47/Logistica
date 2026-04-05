@@ -486,6 +486,10 @@ def build_ship_eta_table(
                 "Barco": ship_id,
                 "Origen": row.get("origin_port", "N/A"),
                 "Destino": row.get("dest_port", "N/A"),
+                "Lat": row.get("lat", "N/A"),
+                "Lon": row.get("lon", "N/A"),
+                "Fecha de salida": row.get("fecha_salida_origen", "N/A"),
+                "Dias de viaje": row.get("voyage_days_total", "N/A"),
                 "ETA Original": (now + timedelta(hours=base_hours)).strftime("%Y-%m-%d %H:%M"),
                 "ETA Recalculada": (now + timedelta(hours=recalculated_hours)).strftime("%Y-%m-%d %H:%M"),
                 "Coste Maritimo (EUR)": maritime_cost,
@@ -1378,93 +1382,86 @@ elif current_page == "4. KDD Fase I - Ingesta":
         active_constraints=active_constraints,
     )
 
-    map_col, table_col = st.columns([1, 1])
-    with map_col:
-        st.subheader("Mapa operacional")
-        layers = []
-        if not ports_df.empty and {"port_name", "lat", "lon"}.issubset(ports_df.columns):
-            ports_layer = ports_df.copy()
-            if not alerts_df.empty and "via_port" in alerts_df.columns:
-                ports_layer = ports_layer.merge(
-                    alerts_df[["via_port", "severity", "risk_level"]],
-                    left_on="port_name",
-                    right_on="via_port",
-                    how="left",
-                )
-                ports_layer["severity"] = ports_layer["severity"].fillna(1)
-            else:
-                ports_layer["severity"] = 1
-            ports_layer["fill_color"] = ports_layer["severity"].apply(
-                lambda sev: [220, 38, 38, 180] if sev >= 4 else [245, 158, 11, 180] if sev >= 3 else [34, 197, 94, 180]
+    st.subheader("Mapa operacional")
+    layers = []
+    if not ships_map_df.empty and {"lat", "lon"}.issubset(ships_map_df.columns):
+        ships_map_df = ships_map_df.copy()
+        ships_map_df = enrich_ship_eta_dates(ships_map_df)
+        ships_map_df["tooltip_text"] = ships_map_df.apply(
+            lambda row: (
+                f"Barco: {row.get('ship_id', '')}\nOrigen: {row.get('origin_port', '')}\n"
+                f"Destino: {row.get('dest_port', '')}\nETA: {row.get('eta_fecha', 'N/A')}"
+            ),
+            axis=1,
+        )
+        ships_map_df["fill_color"] = [[37, 99, 235, 220]] * len(ships_map_df)
+        layers.append(
+            pdk.Layer(
+                "ScatterplotLayer",
+                data=ships_map_df,
+                get_position="[lon, lat]",
+                get_radius=26000,
+                get_fill_color="fill_color",
+                pickable=True,
             )
-            layers.append(
-                pdk.Layer(
-                    "ScatterplotLayer",
-                    data=ports_layer,
-                    get_position="[lon, lat]",
-                    get_radius=38000,
-                    get_fill_color="fill_color",
-                    pickable=True,
-                )
-            )
+        )
 
-        if not routes_df.empty and {"origin_lat", "origin_lon", "dest_lat", "dest_lon"}.issubset(routes_df.columns):
-            layers.append(
-                pdk.Layer(
-                    "LineLayer",
-                    data=routes_df,
-                    get_source_position="[origin_lon, origin_lat]",
-                    get_target_position="[dest_lon, dest_lat]",
-                    get_color="color",
-                    get_width=3,
-                    pickable=True,
-                )
-            )
+    if layers:
+        st.pydeck_chart(
+            pdk.Deck(
+                map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+                initial_view_state=pdk.ViewState(latitude=24.0, longitude=62.0, zoom=1.05, pitch=0),
+                layers=layers,
+                tooltip={"text": "{tooltip_text}"},
+            ),
+            use_container_width=True,
+        )
+    else:
+        st.info("No hay datos geográficos disponibles para el mapa operacional.")
 
-        if not ships_map_df.empty and {"lat", "lon"}.issubset(ships_map_df.columns):
-            ships_map_df = ships_map_df.copy()
-            ships_map_df["tooltip_text"] = ships_map_df.apply(
-                lambda row: (
-                    f"Barco: {row.get('ship_id', '')}\nOrigen: {row.get('origin_port', '')}\n"
-                    f"Destino: {row.get('dest_port', '')}\nETA: {row.get('eta_hours_estimate', 'N/A')} h"
-                ),
-                axis=1,
-            )
-            ships_map_df["fill_color"] = [[37, 99, 235, 220]] * len(ships_map_df)
-            layers.append(
-                pdk.Layer(
-                    "ScatterplotLayer",
-                    data=ships_map_df,
-                    get_position="[lon, lat]",
-                    get_radius=26000,
-                    get_fill_color="fill_color",
-                    pickable=True,
-                )
-            )
+    st.subheader("Tabla de Barcos y ETA")
+    if eta_table_df.empty:
+        st.info("No hay barcos disponibles para mostrar la tabla de ETA.")
+    else:
+        eta_table_df = eta_table_df.copy()
+        if {"Lat", "Lon"}.issubset(eta_table_df.columns):
+            eta_table_df["GPS"] = eta_table_df.apply(lambda row: f"{row['Lat']}, {row['Lon']}", axis=1)
+        st.dataframe(
+            eta_table_df[[c for c in ["Barco", "Origen", "Destino", "GPS", "ETA Original", "ETA Recalculada", "Coste Maritimo (EUR)", "Icono Aereo", "Estado"] if c in eta_table_df.columns]],
+            use_container_width=True,
+            hide_index=True,
+        )
 
-        if layers:
-            st.pydeck_chart(
-                pdk.Deck(
-                    map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-                    initial_view_state=pdk.ViewState(latitude=32.0, longitude=20.0, zoom=1.35, pitch=0),
-                    layers=layers,
-                    tooltip={"text": "{tooltip_text}"},
-                ),
-                use_container_width=True,
+    st.subheader("Corredores Maritimos")
+    corridor_layers = []
+    if not routes_df.empty and {"origin_lat", "origin_lon", "dest_lat", "dest_lon"}.issubset(routes_df.columns):
+        corridors_df = routes_df.copy()
+        corridors_df["corridor_color"] = corridors_df["origin_port"].apply(
+            lambda origin: [220, 38, 38, 140] if origin == "Shanghai" else [37, 99, 235, 140]
+        )
+        corridor_layers.append(
+            pdk.Layer(
+                "LineLayer",
+                data=corridors_df,
+                get_source_position="[origin_lon, origin_lat]",
+                get_target_position="[dest_lon, dest_lat]",
+                get_color="corridor_color",
+                get_width=4,
+                pickable=False,
             )
-        else:
-            st.info("No hay datos geográficos disponibles para el mapa operacional.")
+        )
 
-    with table_col:
-        st.subheader("Tabla de Barcos y ETA")
-        if eta_table_df.empty:
-            st.info("No hay barcos disponibles para mostrar la tabla de ETA.")
-        else:
-            st.dataframe(
-                eta_table_df[["Barco", "Origen", "Destino", "ETA Original", "ETA Recalculada", "Coste Maritimo (EUR)", "Icono Aereo", "Estado"]],
-                use_container_width=True,
-                hide_index=True,
-            )
+    if corridor_layers:
+        st.pydeck_chart(
+            pdk.Deck(
+                map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+                initial_view_state=pdk.ViewState(latitude=24.0, longitude=62.0, zoom=1.05, pitch=0),
+                layers=corridor_layers,
+            ),
+            use_container_width=True,
+        )
+    else:
+        st.info("No hay corredores maritimos disponibles para mostrar.")
 
 elif current_page == "5. KDD Fase II - Spark":
     st.subheader("Spark SQL + Streaming")
