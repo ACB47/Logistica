@@ -1,5 +1,7 @@
 # Proyecto Logística Marítima (Big Data)
 
+Autora del proyecto: **Ana Coloma Bausela**
+
 Este repositorio contiene la **guía paso a paso** y los **artefactos** para el proyecto integral de Ingeniería de Datos (ciclo KDD) usando stack Apache.
 
 ## Docker - Ejecución portable

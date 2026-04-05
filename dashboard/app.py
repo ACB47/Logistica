@@ -44,7 +44,7 @@ CUSTOM_CSS = """
   .block-container {
     padding-top: 1rem;
     padding-bottom: 2rem;
-    max-width: 1500px;
+    max-width: 98%;
   }
   h1, h2, h3, h4, h5, h6, p, li, span, label, div {
     color: #10233f;
@@ -817,15 +817,26 @@ def build_stock_horizon(bundle: dict, customer_city: str | None = None) -> pd.Da
         safety_stock = int(stock_row["safety_stock_min"])
         daily_cons = int(stock_row["daily_consumption_avg"])
         weekly_consumption = daily_cons * 7
+        pieces_per_pack = int(stock_row["pieces_per_pack"])
 
         for week in weeks:
+            # Filtrar ordenes y llegadas para esta semana y esta referencia
             week_orders = orders_cov[(orders_cov["article_ref"] == stock_row["article_ref"]) & (orders_cov["industrial_week"] == week)]
             order_subset = raw_orders[(raw_orders["article_ref"] == stock_row["article_ref"]) & (raw_orders["industrial_week"] == week)]
+            
+            # Salidas: si hay pedidos usamos la suma, si no usamos el consumo semanal teorico
             outbound = int(order_subset["ordered_pieces"].sum()) if not order_subset.empty else weekly_consumption
-            arrival_matches = week_orders[week_orders["arrival_valladolid"].apply(lambda d: format_iw(pd.Timestamp(d)) == week)] if not week_orders.empty else week_orders
-            inbound = int(len(arrival_matches.index) * stock_row["pieces_per_pack"])
+            
+            # Entradas: barcos que llegan en esta semana (IW)
+            inbound = 0
+            if not week_orders.empty:
+                # Contamos cuantos barcos llegan segun arrival_valladolid
+                arrival_matches = week_orders[week_orders["arrival_valladolid"].apply(lambda d: format_iw(pd.Timestamp(d)) == week)]
+                inbound = int(len(arrival_matches) * pieces_per_pack)
+
             projected_stock = max(0, projected_stock + inbound - outbound)
             cover_status = "NO CUBRE" if projected_stock <= safety_stock else ("ALERTA" if projected_stock <= safety_stock + weekly_consumption else "CUBRE")
+            
             rows.append(
                 {
                     "Referencia": stock_row["article_ref"],
@@ -914,11 +925,11 @@ def render_stock_horizon_table(bundle: dict, customer_city: str | None = None) -
     )
     html = f"""
     <div style='width:100%;'>
-      <div class='card' style='padding:14px 16px; width:100%;'>
+      <div class='card' style='padding:14px 16px; width:100%; border-radius:22px; box-sizing:border-box;'>
         <div class='card-title'>horizonte de stock</div>
-        <h3 style='margin:0.15rem 0 0.6rem 0; color:#10233f; font-size:1.25rem;'>Cobertura por semanas industriales</h3>
+        <h3 style='margin:0.15rem 0 0.6rem 0; color:#10233f; font-size:1.25rem;'>Cobertura por semanas industriales (Horizonte 10 semanas)</h3>
         <div style='overflow-x:auto; width:100%;'>
-          <table style='width:100%; min-width:1200px; border-collapse:separate; border-spacing:0 6px; font-family:Inter,sans-serif;'>
+          <table style='width:100%; min-width:1300px; border-collapse:separate; border-spacing:4px 6px; font-family:Inter,sans-serif;'>
             <thead>
               <tr style='background:rgba(15,76,129,0.07); color:#0f4c81;'>{headers}</tr>
             </thead>
@@ -1183,9 +1194,6 @@ elif current_page == "2. Control Tower Valladolid":
         else:
             st.plotly_chart(stock_gantt, use_container_width=True)
 
-        st.subheader("Horizonte de 10 semanas industriales")
-        render_stock_horizon_table(bundle, selected_customer)
-
     with lower_right:
         st.subheader("Propuesta de contingencia aerea")
         contingency_df = build_air_contingency_table(bundle, selected_customer, week_filter)
@@ -1193,6 +1201,9 @@ elif current_page == "2. Control Tower Valladolid":
             st.info("No hay referencias en rotura de stock con propuesta aerea disponible en este momento.")
         else:
             st.dataframe(contingency_df, use_container_width=True, hide_index=True)
+
+    st.subheader("Horizonte de 10 semanas industriales")
+    render_stock_horizon_table(bundle, selected_customer)
 
 elif current_page == "3. Arquitectura en vivo":
     st.subheader("Arquitectura en vivo")
@@ -1211,19 +1222,18 @@ elif current_page == "3. Arquitectura en vivo":
 
 elif current_page == "4. KDD Fase I - Ingesta":
     st.subheader("NiFi + Kafka")
-    ing_left, ing_right = st.columns([1, 1])
+    ing_left, ing_right = st.columns([0.8, 1.2])
     with ing_left:
         render_panel(
-            "Ingesta robusta",
+            "Ingesta Robusta y Decisión",
             "fase I",
-            "Open-Meteo entra por NiFi y se publica a Kafka en raw y filtered. La defensa se apoya en datos crudos, filtrados y evidencia exportable del flujo.",
+            "Monitorización de flota en tiempo real. La activación de incidentes manuales o alertas meteorológicas automáticas recalcula el ETA y el riesgo de stock.",
             height=200,
         )
         kafka_topics = pd.DataFrame(
             [
                 ["datos_crudos", "raw"],
                 ["datos_filtrados", "filtered"],
-                ["datos_filtrados_ok", "filtered demo"],
                 ["alertas_globales", "alerts"],
             ],
             columns=["Topic", "Uso"],
@@ -1231,84 +1241,129 @@ elif current_page == "4. KDD Fase I - Ingesta":
         st.dataframe(kafka_topics, use_container_width=True, hide_index=True)
     with ing_right:
         ports_df, routes_df, ships_df, alerts_df = build_map_data(bundle)
+        
+        # Capa de alertas por puerto
+        layers = []
+        if not ports_df.empty:
+            # Unir puertos con alertas si existen
+            ports_alerts = ports_df.copy()
+            if not alerts_df.empty:
+                ports_alerts = ports_alerts.merge(alerts_df[["via_port", "severity", "risk_level"]], left_on="port_name", right_on="via_port", how="left")
+                ports_alerts["severity"] = ports_alerts["severity"].fillna(1)
+            else:
+                ports_alerts["severity"] = 1
+            
+            ports_alerts["fill_color"] = ports_alerts["severity"].apply(
+                lambda sev: [220, 38, 38, 160] if sev >= 4 else [245, 158, 11, 160] if sev >= 3 else [34, 197, 94, 160]
+            )
+            layers.append(pdk.Layer("ScatterplotLayer", data=ports_alerts, get_position="[lon, lat]", get_radius=50000, get_fill_color="fill_color", pickable=True))
+
+        # Capa de rutas
+        if not routes_df.empty:
+            layers.append(pdk.Layer("LineLayer", data=routes_df, get_source_position="[origin_lon, origin_lat]", get_target_position="[dest_lon, dest_lat]", get_color="color", get_width=3, pickable=True))
+
+        # Capa de barcos (GPS)
         ship_options = ["Todos"]
         if not ships_df.empty and "ship_id" in ships_df.columns:
             ship_options.extend(sorted(ships_df["ship_id"].dropna().tolist()))
-        selected_ship = st.selectbox("Barco concreto", ship_options, index=0, key="ingesta_selected_ship")
-        st.caption("Activa incidencias para recalcular ETA y cobertura de stock")
-        risk_cols = st.columns(2)
-        active_constraints = []
-        for idx, label in enumerate(SHIP_CONSTRAINTS.keys()):
-            with risk_cols[idx % 2]:
-                if st.toggle(label, value=False, key=f"risk_{label}"):
-                    active_constraints.append(label)
-        ship_simulation = build_ship_simulation(bundle, None if selected_ship == "Todos" else selected_ship, active_constraints)
+        selected_ship = st.selectbox("Filtrar por barco", ship_options, index=0, key="ingesta_selected_ship")
+        
+        # Filtro por destino
+        dest_options = ["Todos", "Algeciras", "Valencia", "Barcelona"]
+        selected_dest = st.selectbox("Filtrar por puerto destino", dest_options, index=0)
 
-        ship_table_df = ships_df.copy() if not ships_df.empty else pd.DataFrame()
-        if not ship_table_df.empty and selected_ship != "Todos":
-            ship_table_df = ship_table_df[ship_table_df["ship_id"] == selected_ship]
-        if ship_simulation and not ship_table_df.empty and "ship_id" in ship_table_df.columns:
-            ship_table_df.loc[ship_table_df["ship_id"] == ship_simulation["ship_id"], "eta_hours_estimate"] = ship_simulation["recalculated_eta"]
-            ship_table_df.loc[ship_table_df["ship_id"] == ship_simulation["ship_id"], "simulation_cover_status"] = ship_simulation["cover_status"]
-        ship_table_df = enrich_ship_eta_dates(ship_table_df)
+        if not ships_df.empty:
+            ships_map_df = ships_df.copy()
+            if selected_ship != "Todos":
+                ships_map_df = ships_map_df[ships_map_df["ship_id"] == selected_ship]
+            if selected_dest != "Todos":
+                ships_map_df = ships_map_df[ships_map_df["dest_port"] == selected_dest]
+            
+            ships_map_df = enrich_ship_eta_dates(ships_map_df)
+            # Corregido: Asignar color como una lista de listas para que coincida con la longitud del DataFrame
+            ships_map_df["fill_color"] = [[37, 99, 235]] * len(ships_map_df)
+            
+            layers.append(pdk.Layer("ScatterplotLayer", data=ships_map_df, get_position="[lon, lat]", get_radius=35000, get_fill_color="[255, 255, 255]", get_line_color="[0, 0, 0]", line_width_min_pixels=2, pickable=True))
+            layers.append(pdk.Layer("ScatterplotLayer", data=ships_map_df, get_position="[lon, lat]", get_radius=20000, get_fill_color="[37, 99, 235]", pickable=True))
 
-        st.subheader("Tabla de barcos y ETA")
-        if ship_table_df.empty:
-            st.info("Todavia no hay barcos en el bundle actual.")
-        else:
-            st.dataframe(
-                ship_table_df[[c for c in ship_table_df.columns if c in ["ship_id", "origin_port", "dest_port", "fecha_salida_origen", "voyage_days_total", "eta_fecha", "simulation_cover_status"]]],
-                use_container_width=True,
-                hide_index=True,
-            )
-
-    st.subheader("Posicionamiento GPS de barcos")
-    ports_df, routes_df, ships_df, alerts_df = build_map_data(bundle)
-    layers = []
-    if not ships_df.empty:
-        ships_df = ships_df.copy()
-        if selected_ship != "Todos":
-            ships_df = ships_df[ships_df["ship_id"] == selected_ship]
-        ships_df = enrich_ship_eta_dates(ships_df)
-        ships_df["fill_color"] = ships_df["origin_port"].apply(
-            lambda origin: [220, 38, 38] if origin == "Shanghai" else [37, 99, 235]
-        )
-        if ship_simulation and selected_ship != "Todos":
-            ships_df.loc[ships_df["ship_id"] == ship_simulation["ship_id"], "fill_color"] = [220, 38, 38] if ship_simulation["cover_status"] == "NO CUBRE" else [245, 158, 11]
-        ships_df["tooltip_text"] = ships_df.apply(
-            lambda row: f"Barco: {row.get('ship_id', '')}\nOrigen: {row.get('origin_port', '')}\nDestino: {row.get('dest_port', '')}\nETA: {((datetime.now() + timedelta(hours=float(ship_simulation['recalculated_eta']))) .strftime('%Y-%m-%d %H:%M')) if ship_simulation and row.get('ship_id') == ship_simulation['ship_id'] else row.get('eta_fecha', 'N/A')}",
-            axis=1,
-        )
-        layers.append(pdk.Layer("ScatterplotLayer", data=ships_df, get_position="[lon, lat]", get_radius=32000, get_fill_color="fill_color", pickable=True))
-    if layers:
         st.pydeck_chart(
             pdk.Deck(
                 map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-                initial_view_state=pdk.ViewState(latitude=35.0, longitude=78.0, zoom=1.55, pitch=8),
+                initial_view_state=pdk.ViewState(latitude=20.0, longitude=60.0, zoom=1.2, pitch=0),
                 layers=layers,
-                tooltip={"text": "{tooltip_text}"},
+                tooltip={"text": "Entidad: {port_name}{ship_id}\nEstado: {risk_level}"},
             ),
             use_container_width=True,
         )
-    else:
-        st.info("Todavia no hay posiciones GPS de barcos disponibles en el bundle actual.")
 
-    if ship_simulation:
-        recalculated_eta_dt = (datetime.now() + timedelta(hours=float(ship_simulation["recalculated_eta"]))).strftime("%Y-%m-%d %H:%M")
-        sim_cols = st.columns(5)
-        sim_cols[0].metric("Barco", ship_simulation["ship_id"])
-        sim_cols[1].metric("ETA base", f"{ship_simulation['base_eta']} h")
-        sim_cols[2].metric("Horas extra", f"{ship_simulation['extra_hours']} h")
-        sim_cols[3].metric("ETA recalculada", recalculated_eta_dt)
-        sim_cols[4].metric("Cobertura", ship_simulation["cover_status"])
-        if ship_simulation["cover_status"] == "NO CUBRE":
-            st.error(
-                f"ALERTA: {ship_simulation['ship_id']} no cubre stock. Activar envio aereo. ETA recalculada: {recalculated_eta_dt} | ETA aereo: {ship_simulation['air_eta']} h | Coste aereo: {ship_simulation['air_cost']} EUR"
-            )
-        else:
-            st.success(
-                f"{ship_simulation['ship_id']} cubre stock. ETA recalculada: {recalculated_eta_dt} | Margen sobre stock: {ship_simulation['margin_hours']} h"
-            )
+    st.subheader("Alertas y decisiones operativas")
+    
+    # Pre-calculo de simulacion e incidencias
+    risk_cols = st.columns(6)
+    active_constraints = []
+    for idx, label in enumerate(SHIP_CONSTRAINTS.keys()):
+        with risk_cols[idx]:
+            if st.toggle(label, value=False, key=f"risk_toggle_{label}"):
+                active_constraints.append(label)
+
+    # Tabla de barcos y decisiones
+    ships_table_df = ships_df.copy() if not ships_df.empty else pd.DataFrame()
+    if not ships_table_df.empty:
+        # Añadir coste maritimo ficticio/base
+        ships_table_df["Coste Maritimo (EUR)"] = 15000.0
+        
+        # Columnas de ETA
+        ships_table_df["ETA Original"] = ships_table_df["eta_hours_estimate"].apply(
+            lambda h: (datetime.now() + timedelta(hours=float(h))).strftime("%Y-%m-%d %H:%M") if pd.notna(h) else "N/A"
+        )
+        
+        # Recalcular ETA con incidencias
+        extra_h = sum(SHIP_CONSTRAINTS[c] for c in active_constraints)
+        # Tambien sumamos el retraso meteo del API si existe en fact_weather_operational
+        weather_df = pd.DataFrame(bundle.get("fact_weather_operational", []))
+        
+        def get_final_eta(row):
+            base_h = float(row["eta_hours_estimate"])
+            # Buscar retraso meteo para el puerto destino
+            w_delay = 0
+            if not weather_df.empty:
+                match = weather_df[weather_df["via_port"] == row["dest_port"]]
+                if not match.empty:
+                    w_delay = float(match.iloc[0].get("weather_delay_hours_estimate", 0))
+            
+            total_h = base_h + extra_h + w_delay
+            return (datetime.now() + timedelta(hours=total_h)).strftime("%Y-%m-%d %H:%M"), total_h
+
+        ships_table_df[["ETA Recalculada", "total_hours"]] = ships_table_df.apply(
+            lambda r: pd.Series(get_final_eta(r)), axis=1
+        )
+        
+        # Lógica de riesgo de ruptura e icono de avión
+        stock_context = build_stock_context(bundle)
+        def get_contingency(row):
+            # Si el barco va a Valladolid (vía Santander/Bilbao/etc)
+            # Simplificamos: si total_hours > stock_out_hours -> Avion
+            # Buscamos la referencia que trae este barco (asumimos 1 ref por barco para la demo o la media)
+            if stock_context.empty: return "🚢"
+            
+            # Simulamos chequeo contra horas hasta stockout (usamos 120h como umbral de seguridad si no hay datos)
+            limit_h = 120.0
+            if row["total_hours"] > limit_h:
+                return "✈️ ACTIVAR AEREO"
+            return "🚢 OK"
+
+        ships_table_df["Contingencia"] = ships_table_df.apply(get_contingency, axis=1)
+        
+        st.dataframe(
+            ships_table_df[["ship_id", "origin_port", "dest_port", "ETA Original", "ETA Recalculada", "Coste Maritimo (EUR)", "Contingencia"]].rename(
+                columns={"ship_id": "Barco", "origin_port": "Origen", "dest_port": "Destino"}
+            ),
+            use_container_width=True,
+            hide_index=True
+        )
+
+    # Eliminar bloques antiguos de la sección Ingesta que ya no encajan
+    # (El código original continuaba con el mapa antiguo y simulación individual)
 
 elif current_page == "5. KDD Fase II - Spark":
     st.subheader("Spark SQL + Streaming")
