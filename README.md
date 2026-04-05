@@ -16,6 +16,12 @@ El proyecto está **completamente dockerizado** para ejecutarse en cualquier ord
 ./start.sh
 ```
 
+### Dashboard con datos reales
+- Para ver el dashboard Streamlit con datos completos, usa el stack HDFS:
+  - `docker compose -f docker-compose.hdfs.yml up -d`
+- Si quieres refrescar el bundle del dashboard:
+  - `docker compose -f docker-compose.hdfs.yml exec -T spark spark-submit /home/jovyan/jobs/spark/99_dashboard_bundle.py`
+
 ### Servicios disponibles
 | Servicio | URL |
 |----------|-----|
@@ -72,6 +78,7 @@ El proyecto está **completamente dockerizado** para ejecutarse en cualquier ord
 - Motivo: menor complejidad para dashboard, mapas, estados de servicio y paneles KDD.
 - Ejecucion:
   - `bash scripts/67_run_dashboard.sh`
+- Si el dashboard aparece vacio, levantar primero el stack HDFS y regenerar el bundle.
 - Incluye:
   - estado de servicios `OK/NOK/OFF`
   - botones de arranque/parada por servicio

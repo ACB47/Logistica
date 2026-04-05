@@ -1,0 +1,152 @@
+version: '3.8'
+
+services:
+  kafka:
+    image: apache/kafka:3.9.1
+    ports:
+      - "9092:9094"
+    environment:
+      CLUSTER_ID: "5L6g3nShT-eMCtK--X86sw"
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - logistica-net
+
+  kafka-init:
+    image: apache/kafka:3.9.1
+    depends_on:
+      - kafka
+    command: >
+      bash -ec "
+        sleep 15 &&
+        for topic in datos_crudos alertas_globales datos_filtrados datos_filtrados_ok; do
+          /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1 --topic \"$$topic\";
+        done &&
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
+      "
+    networks:
+      - logistica-net
+
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    ports:
+      - "9870:9870"
+      - "9000:9000"
+    volumes:
+      - hdfs_namenode:/hadoop/dfs/name
+    environment:
+      CLUSTER_NAME: logistica-cluster
+      CORE_CONF_fs_defaultFS: hdfs://namenode:8020
+      HDFS_CONF_dfs_replication: 1
+    networks:
+      - logistica-net
+
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    depends_on:
+      - namenode
+    volumes:
+      - hdfs_datanode:/hadoop/dfs/data
+    environment:
+      CORE_CONF_fs_defaultFS: hdfs://namenode:8020
+      HDFS_CONF_dfs_replication: 1
+      SERVICE_PRECONDITION: "namenode:9870"
+    networks:
+      - logistica-net
+
+  cassandra:
+    image: cassandra:5.0
+    ports:
+      - "9042:9042"
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+    networks:
+      - logistica-net
+
+  spark:
+    image: jupyter/pyspark-notebook:latest
+    environment:
+      JAVA_TOOL_OPTIONS: -Dderby.system.home=/home/jovyan/.derby
+    ports:
+      - "8888:8888"
+      - "4040:4040"
+      - "8080:8080"
+    volumes:
+      - ./jobs:/home/jovyan/jobs
+      - ./ingesta:/home/jovyan/ingesta
+      - spark_derby:/home/jovyan/.derby
+      - spark_warehouse_state:/home/jovyan/.spark-local-state
+    networks:
+      - logistica-net
+
+  nifi:
+    image: apache/nifi:2.6.0
+    environment:
+      SINGLE_USER_CREDENTIALS_USERNAME: ${NIFI_USERNAME:-admin}
+      SINGLE_USER_CREDENTIALS_PASSWORD: ${NIFI_PASSWORD:-Admin123456!}
+    ports:
+      - "8443:8443"
+    networks:
+      - logistica-net
+
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - logistica-net
+
+  airflow-webserver:
+    image: apache/airflow:2.10.5-python3.10
+    user: "${AIRFLOW_UID:-1000}:0"
+    depends_on:
+      - kafka
+      - postgres
+    command: standalone
+    ports:
+      - "8085:8080"
+    environment:
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+      AIRFLOW__SMTP__SMTP_HOST: ${SMTP_HOST:-smtp-mail.outlook.com}
+      AIRFLOW__SMTP__SMTP_PORT: ${SMTP_PORT:-587}
+      AIRFLOW__SMTP__SMTP_USER: ${SMTP_USER:-logistica-alerts@outlook.com}
+      AIRFLOW__SMTP__SMTP_PASSWORD: ${SMTP_PASSWORD:-CHANGE_ME}
+    volumes:
+      - ./airflow:/opt/airflow
+      - ./jobs:/jobs
+      - ./ingesta:/ingesta
+    networks:
+      - logistica-net
+
+volumes:
+  hdfs_namenode:
+  hdfs_datanode:
+  cassandra_data:
+  kafka_data:
+  postgres_data:
+  spark_derby:
+  spark_warehouse_state:
+
+networks:
+  logistica-net:
+    driver: bridge

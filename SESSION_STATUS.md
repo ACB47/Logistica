@@ -4,7 +4,7 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 
 ## Ultima actualizacion
 - Fecha de referencia: 2026-04-05
-- Contexto: se redisenio la pestaña `Control Tower` y la pestaña `KDD Fase I - Ingesta` del dashboard Streamlit, con foco en horizonte de 10 semanas, mapa operacional y tabla de ETA.
+- Contexto: se redisenio la pestaña `Control Tower` y la pestaña `KDD Fase I - Ingesta` del dashboard Streamlit, se documento el stack HDFS para el dashboard y se dejo el bundle regenerado con datos reales.
 
 ## Resumen ejecutivo
 - El proyecto ya tiene una base funcional de demo: productores Kafka, landing raw en HDFS, jobs Spark batch, tablas Hive, soporte Cassandra, notebooks Zeppelin y un DAG de Airflow.
@@ -37,6 +37,7 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - El rebuild completo ya queda validado de nuevo: `fact_alerts` y el resto de tablas principales reaparecen correctamente tras `scripts/66_rebuild_hive_demo_tables.sh`.
 - Ya existe una base de dashboard en `Streamlit` con mapa, diagramas, estado de servicios y tablas clave para la defensa.
 - La pestaña `KDD Fase I - Ingesta` ya se rearmo para mostrar un mapa operacional de barcos en transito, rutas, puertos y una tabla de ETA con ETA original, ETA recalculada, coste maritimo e icono aereo.
+- Se anadio `docker-compose.hdfs.yml` como stack de referencia para ver el dashboard con datos reales, evitando el bundle vacio del stack simple.
 - Ya existe en codigo un nuevo caso de uso de contingencia: comparacion `barco vs aereo+camion` hasta Valladolid mediante `jobs/spark/03_air_recovery_options.py`.
 - `logistica.fact_air_recovery_options` ya fue generada y consultada con un caso valido de comparacion `barco vs aereo+camion`.
 - Regla operativa confirmada: los `spark-submit` y `spark-sql` con Hive deben ejecutarse secuencialmente para evitar bloqueos de Derby en el metastore embebido.
@@ -44,6 +45,7 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - El dashboard ya contempla dos clientes franceses (`Douai` y `Cleon`), dos orígenes asiáticos (`Shanghai` y `Yokohama`) y simulación de incidencias por barco con recálculo de ETA y `CUBRE / NO CUBRE`.
 - La pestaña de ingesta ya debe enseñar tabla de barcos con ETA en formato fecha, salida desde origen y visualización GPS sobre el corredor marítimo Asia -> España.
 - Punto exacto de reanudacion: al volver hay que refrescar el bundle del dashboard con `spark-submit jobs/spark/99_dashboard_bundle.py` y comprobar que el mapa operacional y la tabla de ETA cargan con los filtros de destino/barco.
+- Punto exacto de reanudacion: si el dashboard sale vacio, levantar `docker compose -f docker-compose.hdfs.yml up -d` y regenerar `dashboard_bundle_output.json` antes de abrir Streamlit.
 - El bundle del dashboard ya incorpora `eta_hours_estimate` por barco para conectar ETA con riesgo de stock y decisiones de contingencia.
 - Lo mas importante pendiente ahora es cerrar evidencias, Airflow visual, narrativa final de defensa y documentacion completa sobre la ruta Docker/local.
 
