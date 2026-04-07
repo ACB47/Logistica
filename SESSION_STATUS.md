@@ -3,8 +3,8 @@
 Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el repo.
 
 ## Ultima actualizacion
-- Fecha de referencia: 2026-04-05
-- Contexto: se redisenio la pestaña `Control Tower` y la pestaña `KDD Fase I - Ingesta` del dashboard Streamlit, se documento el stack HDFS para el dashboard y se dejo el bundle regenerado con datos reales.
+- Fecha de referencia: 2026-04-07
+- Contexto: se mejoro visualmente la pestaña `KDD Fase I - Ingesta` del dashboard Streamlit para que los barcos aparezcan navegando por el corredor marítimo Asia-Europa (no en puerto), se añadieron columnas de GPS y fecha de salida a la tabla de barcos, y se implemento un mapa de `Corredores Maritimos` con lineas de ruta. Servicios Docker actualmente levantados.
 
 ## Resumen ejecutivo
 - El proyecto ya tiene una base funcional de demo: productores Kafka, landing raw en HDFS, jobs Spark batch, tablas Hive, soporte Cassandra, notebooks Zeppelin y un DAG de Airflow.
@@ -48,6 +48,8 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - Punto exacto de reanudacion: si el dashboard sale vacio, levantar `docker compose -f docker-compose.hdfs.yml up -d` y regenerar `dashboard_bundle_output.json` antes de abrir Streamlit.
 - El bundle del dashboard ya incorpora `eta_hours_estimate` por barco para conectar ETA con riesgo de stock y decisiones de contingencia.
 - Lo mas importante pendiente ahora es cerrar evidencias, Airflow visual, narrativa final de defensa y documentacion completa sobre la ruta Docker/local.
+- Se refinó la pestaña `KDD Fase I - Ingesta`: los barcos ahora aparecen en alta mar (corredor marítimo Asia-Europa) y no en coordenadas de puerto; la tabla de barcos incluye columnas `GPS (Lat, Lon)`, `Fecha de salida` y `Días de viaje`; se añadió un mapa `Corredores Marítimos` debajo de la tabla con líneas de colores por origen.
+- Servicios Docker están actualmente levantados (`docker-compose up -d`). Pendiente: ejecutar `spark-submit jobs/spark/99_dashboard_bundle.py` y lanzar `scripts/67_run_dashboard.sh` para validar los cambios.
 
 ## Estado por fases KDD
 

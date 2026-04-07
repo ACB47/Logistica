@@ -1160,6 +1160,8 @@ with st.sidebar:
         "7. Persistencia",
         "8. Orquestacion",
         "9. Evidencias KDD",
+        "10. Alertas y Contingencias",
+        "11. Impacto en Cliente",
     ]
     if "dashboard_page" not in st.session_state:
         st.session_state["dashboard_page"] = page_options[0]
@@ -1515,3 +1517,508 @@ elif current_page == "9. Evidencias KDD":
     stock_df = build_stock_table(bundle)
     if not stock_df.empty:
         st.dataframe(stock_df, use_container_width=True, hide_index=True)
+
+elif current_page == "10. Alertas y Contingencias":
+    st.subheader("Alertas y Contingencias")
+    st.caption("Panel de gestión de alertas críticas y decisiones de contingencia multimodal")
+
+    alerts_df = pd.DataFrame(bundle.get("fact_alerts", []))
+    air_df = pd.DataFrame(bundle.get("fact_air_recovery_options", []))
+
+    alert_col, decision_col = st.columns([1, 1.5])
+
+    with alert_col:
+        st.markdown("##### Panel de Alertas Críticas")
+        if alerts_df.empty:
+            st.info("No hay alertas disponibles.")
+        else:
+            critical_alerts = alerts_df[alerts_df["severity"] >= 3].copy()
+            if critical_alerts.empty:
+                st.success("No hay alertas críticas activas.")
+            else:
+                for _, alert in critical_alerts.iterrows():
+                    severity = alert.get("severity", 0)
+                    if severity >= 4:
+                        bg_color = "#fef2f2"
+                        border_color = "#dc2626"
+                        icon = "🔴"
+                    else:
+                        bg_color = "#fffbeb"
+                        border_color = "#f59e0b"
+                        icon = "🟠"
+
+                    risk_level = alert.get("risk_level", "N/A")
+                    via_port = alert.get("via_port", "N/A")
+                    source = alert.get("source", "N/A")
+                    recommendation = alert.get("recommendation", "")
+
+                    st.markdown(
+                        f"""
+                        <div style="background:{bg_color}; border-left:4px solid {border_color}; border-radius:8px; padding:12px; margin-bottom:10px;">
+                            <div style="font-weight:700; font-size:0.9rem; color:#10233f;">
+                                {icon} Alerta {risk_level} en {via_port}
+                            </div>
+                            <div style="font-size:0.75rem; color:#64748b; margin-top:4px;">
+                                Origen: {source} | Severidad: {severity}
+                            </div>
+                            <div style="font-size:0.8rem; color:#334155; margin-top:8px; line-height:1.4;">
+                                {recommendation[:120]}{'...' if len(recommendation) > 120 else ''}
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+    with decision_col:
+        st.markdown("##### Tabla Interactiva de Decisión")
+        if air_df.empty:
+            st.info("No hay opciones de contingencia disponibles.")
+        else:
+            display_cols = [
+                "ship_id",
+                "origin_port",
+                "dest_port",
+                "ship_remaining_hours",
+                "air_total_eta_hours",
+                "time_saved_hours",
+                "air_total_cost_eur",
+                "recommended_mode",
+            ]
+            available_cols = [c for c in display_cols if c in air_df.columns]
+            decision_df = air_df[available_cols].copy()
+
+            if "recommended_mode" in decision_df.columns:
+                decision_df["Recomendación"] = decision_df["recommended_mode"].apply(
+                    lambda x: f"✈️ AÉREO" if x == "AEREO_CAMION" else "🚢 MARÍTIMO"
+                )
+
+            rename_map = {
+                "ship_id": "Barco",
+                "origin_port": "Origen",
+                "dest_port": "Destino",
+                "ship_remaining_hours": "ETA Marítimo (h)",
+                "air_total_eta_hours": "ETA Aéreo+Camión (h)",
+                "time_saved_hours": "Horas Ganadas",
+                "air_total_cost_eur": "Coste Total (EUR)",
+            }
+            decision_df = decision_df.rename(columns=rename_map)
+
+            st.dataframe(decision_df, use_container_width=True, hide_index=True, height=320)
+
+    st.markdown("---")
+
+    scatter_col, map_col = st.columns([1, 1])
+
+    with scatter_col:
+        st.markdown("##### Scatter Plot de IA (Coste vs. Tiempo)")
+        if air_df.empty:
+            st.info("No hay datos de contingencia aérea para graficar.")
+        else:
+            plot_df = air_df.copy()
+            required_cols = ["time_saved_hours", "air_total_cost_eur", "ship_id", "recommended_mode"]
+            if not all(c in plot_df.columns for c in required_cols):
+                st.warning("Faltan columnas necesarias para el scatter plot.")
+            else:
+                plot_df = plot_df.dropna(subset=["time_saved_hours", "air_total_cost_eur"])
+                plot_df["color"] = plot_df["recommended_mode"].apply(
+                    lambda x: "#dc2626" if x == "AEREO_CAMION" else "#16a34a"
+                )
+                plot_df["size"] = plot_df["recommended_mode"].apply(lambda x: 14 if x == "AEREO_CAMION" else 10)
+                plot_df["tooltip"] = plot_df.apply(
+                    lambda row: (
+                        f"Barco: {row.get('ship_id', '')}<br>"
+                        f"Origen: {row.get('origin_port', '')}<br>"
+                        f"Destino: {row.get('dest_port', '')}<br>"
+                        f"Horas ganadas: {row.get('time_saved_hours', 0):.1f}h<br>"
+                        f"Coste: €{row.get('air_total_cost_eur', 0):,.0f}<br>"
+                        f"Recomendación: {row.get('recommended_mode', '')}"
+                    ),
+                    axis=1,
+                )
+
+                fig = px.scatter(
+                    plot_df,
+                    x="time_saved_hours",
+                    y="air_total_cost_eur",
+                    hover_data={"ship_id": True, "origin_port": True, "dest_port": True},
+                    custom_data=["tooltip"],
+                )
+                fig.update_traces(
+                    marker=dict(
+                        color=plot_df["color"],
+                        size=plot_df["size"],
+                        line=dict(width=1, color="#10233f"),
+                    ),
+                    hovertemplate="%{customdata[0]}<extra></extra>",
+                )
+                fig.update_layout(
+                    height=420,
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(255,255,255,0.6)",
+                    font_color="#10233f",
+                    xaxis_title="Horas Ganadas (h)",
+                    yaxis_title="Coste Total (EUR)",
+                    showlegend=False,
+                    margin=dict(l=10, r=10, t=20, b=40),
+                )
+                fig.add_annotation(
+                    x=0.5, y=-0.18,
+                    text="Punto óptimo: abajo-derecha = más horas ganadas + menor coste",
+                    showarrow=False,
+                    font=dict(size=11, color="#64748b"),
+                    xref="paper", yref="paper",
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+    with map_col:
+        st.markdown("##### Mapa de Contingencia Multimodal")
+        ports_df = pd.DataFrame(bundle.get("dim_ports", []))
+        if ports_df.empty:
+            st.info("No hay datos de puertos disponibles para el mapa.")
+        else:
+            asia_ports = ports_df[ports_df["port_name"].isin(["Shanghai", "Yokohama"])]
+            spain_ports = ports_df[ports_df["port_name"].isin(["Algeciras", "Valencia", "Barcelona"])]
+            valladolid = pd.DataFrame([{"port_name": "Valladolid", "lat": 41.6528, "lon": -4.7246}])
+
+            map_layers = []
+
+            if not asia_ports.empty:
+                asia_coords = asia_ports[["lon", "lat"]].values.tolist()
+                map_layers.append(
+                    pdk.Layer(
+                        "ScatterplotLayer",
+                        data=asia_ports,
+                        get_position="[lon, lat]",
+                        get_radius=25000,
+                        get_fill_color=[220, 38, 38, 200],
+                        pickable=True,
+                    )
+                )
+
+            if not spain_ports.empty:
+                map_layers.append(
+                    pdk.Layer(
+                        "ScatterplotLayer",
+                        data=spain_ports,
+                        get_position="[lon, lat]",
+                        get_radius=25000,
+                        get_fill_color=[37, 99, 235, 200],
+                        pickable=True,
+                    )
+                )
+
+            if not valladolid.empty:
+                map_layers.append(
+                    pdk.Layer(
+                        "ScatterplotLayer",
+                        data=valladolid,
+                        get_position="[lon, lat]",
+                        get_radius=15000,
+                        get_fill_color=[34, 197, 94, 200],
+                        pickable=True,
+                    )
+                )
+
+            route_data = []
+            for _, asia_row in asia_ports.iterrows():
+                for _, spain_row in spain_ports.iterrows():
+                    route_data.append({
+                        "origin_lon": asia_row["lon"],
+                        "origin_lat": asia_row["lat"],
+                        "dest_lon": spain_row["lon"],
+                        "dest_lat": spain_row["lat"],
+                        "route_name": f"{asia_row['port_name']} -> {spain_row['port_name']}",
+                    })
+
+            if route_data:
+                route_df = pd.DataFrame(route_data)
+                map_layers.append(
+                    pdk.Layer(
+                        "LineLayer",
+                        data=route_df,
+                        get_source_position="[origin_lon, origin_lat]",
+                        get_target_position="[dest_lon, dest_lat]",
+                        get_color=[220, 38, 38, 120],
+                        get_width=3,
+                        pickable=False,
+                    )
+                )
+
+            deviation_data = []
+            for _, asia_row in asia_ports.iterrows():
+                deviation_data.append({
+                    "origin_lon": asia_row["lon"],
+                    "origin_lat": asia_row["lat"],
+                    "dest_lon": -4.7246,
+                    "dest_lat": 41.6528,
+                    "route_name": f"Desvío {asia_row['port_name']} -> Valladolid",
+                })
+
+            if deviation_data:
+                deviation_df = pd.DataFrame(deviation_data)
+                map_layers.append(
+                    pdk.Layer(
+                        "LineLayer",
+                        data=deviation_df,
+                        get_source_position="[origin_lon, origin_lat]",
+                        get_target_position="[dest_lon, dest_lat]",
+                        get_color=[34, 197, 94, 180],
+                        get_width=4,
+                        pickable=False,
+                    )
+                )
+
+            if map_layers:
+                st.pydeck_chart(
+                    pdk.Deck(
+                        map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+                        initial_view_state=pdk.ViewState(latitude=25.0, longitude=20.0, zoom=1.2, pitch=0),
+                        layers=map_layers,
+                        tooltip={
+                            "html": (
+                                "<b>{port_name}</b><br>"
+                                "Lat: {lat}<br>"
+                                "Lon: {lon}"
+                            ),
+                            "style": {"backgroundColor": "#fff", "color": "#10233f"},
+                        },
+                    ),
+                    use_container_width=True,
+                )
+
+                st.markdown(
+                    """
+                    <div style="display:flex; gap:16px; margin-top:10px; font-size:0.8rem; color:#64748b;">
+                        <span>🔴 Puerto origen Asia</span>
+                        <span>🔵 Puerto destino España</span>
+                        <span>🟢 Valladolid (aduana)</span>
+                        <span style="border-bottom:2px solid #dc2626;">—— Ruta marítima</span>
+                        <span style="border-bottom:2px solid #22c55e;">—— Desvío aéreo</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.info("No hay suficientes datos para renderizar el mapa de contingencia.")
+
+elif current_page == "11. Impacto en Cliente":
+    st.subheader("Impacto en Cliente")
+    st.caption("Análisis de inventario Valladolid vs. demanda de fábricas en Francia (Douai y Cléon)")
+
+    stock_df = pd.DataFrame(bundle.get("stock_valladolid", []))
+    orders_df = pd.DataFrame(bundle.get("customer_orders_douai", []))
+    gantt_df = pd.DataFrame(bundle.get("article_gantt", []))
+
+    filter_col1, filter_col2, filter_col3 = st.columns([1, 1, 1])
+
+    with filter_col1:
+        selected_customer = st.selectbox(
+            "Cliente Destino",
+            options=["Douai", "Cleon", "Todos"],
+            index=0,
+            key="impact_customer_filter",
+        )
+
+    with filter_col2:
+        available_weeks = ["Todas"]
+        if not orders_df.empty and "industrial_week" in orders_df.columns:
+            weeks = sorted(orders_df["industrial_week"].dropna().unique().tolist())
+            available_weeks.extend(weeks)
+        selected_week = st.selectbox(
+            "Semana Industrial",
+            options=available_weeks,
+            index=0,
+            key="impact_week_filter",
+        )
+
+    with filter_col3:
+        st.markdown("#### Estado Global")
+        if not stock_df.empty and "total_stock_pieces" in stock_df.columns:
+            total_stock = int(stock_df["total_stock_pieces"].sum())
+            safety_stock = int(stock_df["safety_stock_min"].sum())
+            critical_count = int((stock_df["total_stock_pieces"] <= stock_df["safety_stock_min"]).sum())
+            st.metric("Stock Total Valladolid", f"{total_stock:,}", f"{critical_count} críticos")
+        else:
+            st.metric("Stock Total Valladolid", "N/A")
+
+    st.markdown("---")
+
+    stock_col, orders_col = st.columns([1, 1.2])
+
+    with stock_col:
+        st.markdown("##### Panel de Stock - Valladolid")
+        if stock_df.empty:
+            st.info("No hay datos de stock disponibles.")
+        else:
+            stock_display = stock_df.copy()
+            rename_cols = {
+                "article_ref": "ID Artículo",
+                "article_name": "Descripción",
+                "total_stock_pieces": "Stock Físico",
+                "safety_stock_min": "Stock Seguridad",
+                "daily_consumption_avg": "Consumo Diario",
+            }
+            stock_display = stock_display.rename(columns=rename_cols)
+            cols_to_show = [c for c in ["ID Artículo", "Descripción", "Stock Físico", "Stock Seguridad", "Consumo Diario"] if c in stock_display.columns]
+
+            stock_display["Estado"] = stock_display.apply(
+                lambda row: "🔴 RIESGO" if row.get("Stock Físico", 0) <= row.get("Stock Seguridad", 0) else ("🟡 ALERTA" if row.get("Stock Físico", 0) <= row.get("Stock Seguridad", 0) * 1.5 else "🟢 OK"),
+                axis=1,
+            )
+
+            if "Stock Físico" in stock_display.columns and "Stock Seguridad" in stock_display.columns:
+                stock_display["Cobertura (días)"] = stock_display.apply(
+                    lambda row: int(row["Stock Físico"] / row["Consumo Diario"]) if row.get("Consumo Diario", 0) > 0 else 0,
+                    axis=1,
+                )
+
+            st.dataframe(stock_display[cols_to_show + ["Estado", "Cobertura (días)"]], use_container_width=True, hide_index=True, height=350)
+
+            if not stock_df.empty:
+                total_stock = int(stock_df["total_stock_pieces"].sum())
+                avg_coverage = int(total_stock / stock_df["daily_consumption_avg"].sum()) if stock_df["daily_consumption_avg"].sum() > 0 else 0
+                m1, m2, m3 = st.columns(3)
+                with m1:
+                    st.metric("Total Piezas", f"{total_stock:,}")
+                with m2:
+                    st.metric("Referencias", str(len(stock_df)))
+                with m3:
+                    st.metric("Cobertura Promedio", f"{avg_coverage} días")
+
+    with orders_col:
+        st.markdown("##### Pedidos del Cliente")
+        filtered_orders = orders_df.copy()
+        if selected_customer != "Todos" and "customer_city" in filtered_orders.columns:
+            filtered_orders = filtered_orders[filtered_orders["customer_city"] == selected_customer]
+        if selected_week != "Todas" and "industrial_week" in filtered_orders.columns:
+            filtered_orders = filtered_orders[filtered_orders["industrial_week"] == selected_week]
+
+        if filtered_orders.empty:
+            st.info("No hay pedidos para los filtros seleccionados.")
+        else:
+            orders_display = filtered_orders.copy()
+            rename_cols_orders = {
+                "order_id": "ID Pedido",
+                "article_ref": "Artículo",
+                "customer_city": "Cliente",
+                "industrial_week": "Semana",
+                "planned_delivery_date": "Entrega",
+                "ordered_pieces": "Piezas",
+                "order_status": "Estado",
+            }
+            orders_display = orders_display.rename(columns=rename_cols_orders)
+
+            cols_orders = [c for c in ["ID Pedido", "Artículo", "Cliente", "Semana", "Entrega", "Piezas", "Estado"] if c in orders_display.columns]
+            st.dataframe(orders_display[cols_orders], use_container_width=True, hide_index=True, height=280)
+
+            if not orders_display.empty and "Semana" in orders_display.columns:
+                weekly_demand = orders_display.groupby("Semana")["Piezas"].sum().reset_index()
+                fig_bar = px.bar(
+                    weekly_demand,
+                    x="Semana",
+                    y="Piezas",
+                    text="Piezas",
+                    color_discrete_sequence=["#2563eb"],
+                )
+                fig_bar.update_layout(
+                    height=260,
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(255,255,255,0.6)",
+                    font_color="#10233f",
+                    margin=dict(l=10, r=10, t=20, b=10),
+                    xaxis_title="Semana Industrial",
+                    yaxis_title="Piezas Demandadas",
+                )
+                fig_bar.update_traces(textposition="outside")
+                st.plotly_chart(fig_bar, use_container_width=True)
+
+    st.markdown("---")
+
+    st.markdown("##### Diagrama de Gantt de Cobertura")
+    st.caption("Planificación logística por artículo - Horizonte 10 semanas")
+
+    if gantt_df.empty:
+        st.info("No hay datos de planificación disponibles.")
+    else:
+        gantt_work = gantt_df.copy()
+
+        if "start_date" in gantt_work.columns:
+            gantt_work["start_date"] = pd.to_datetime(gantt_work["start_date"], errors="coerce")
+        if "end_date" in gantt_work.columns:
+            gantt_work["end_date"] = pd.to_datetime(gantt_work["end_date"], errors="coerce")
+
+        if not stock_df.empty and "article_ref" in stock_df.columns:
+            stock_lookup = stock_df.set_index("article_ref")["total_stock_pieces"].to_dict()
+            safety_lookup = stock_df.set_index("article_ref")["safety_stock_min"].to_dict()
+            gantt_work["stock_actual"] = gantt_work["article_ref"].map(stock_lookup).fillna(0)
+            gantt_work["safety_stock"] = gantt_work["article_ref"].map(safety_lookup).fillna(0)
+
+            def compute_coverage_status(row):
+                stock = row.get("stock_actual", 0)
+                safety = row.get("safety_stock", 0)
+                mode = row.get("transport_mode", "sea")
+                if stock <= safety:
+                    return "NO_CUBRE"
+                elif stock <= safety * 1.5:
+                    return "CONTINGENCIA"
+                else:
+                    return "CUBRE"
+
+            gantt_work["coverage_status"] = gantt_work.apply(compute_coverage_status, axis=1)
+
+            color_map_gantt = {
+                "CUBRE": "#16a34a",
+                "CONTINGENCIA": "#f59e0b",
+                "NO_CUBRE": "#dc2626",
+            }
+        else:
+            color_map_gantt = {
+                "sea": "#2563eb",
+                "air": "#dc2626",
+                "truck": "#0891b2",
+            }
+
+        if "coverage_status" in gantt_work.columns:
+            gantt_work["color"] = gantt_work["coverage_status"].map(color_map_gantt)
+        elif "transport_mode" in gantt_work.columns:
+            gantt_work["color"] = gantt_work["transport_mode"].map(color_map_gantt)
+        else:
+            gantt_work["color"] = "#2563eb"
+
+        valid_gantt = gantt_work.dropna(subset=["start_date", "end_date"])
+        if valid_gantt.empty:
+            st.warning("No hay fechas válidas para el Gantt.")
+        else:
+            fig_gantt = px.timeline(
+                valid_gantt,
+                x_start="start_date",
+                x_end="end_date",
+                y="article_ref",
+                color="color",
+                hover_data=["industrial_week", "transport_mode"],
+                color_discrete_map=color_map_gantt,
+            )
+            fig_gantt.update_layout(
+                height=420,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(255,255,255,0.6)",
+                font_color="#10233f",
+                margin=dict(l=10, r=10, t=20, b=20),
+                xaxis_title="Calendario (Fechas)",
+                yaxis_title="ID Artículo",
+                showlegend=True,
+                legend_title="Estado Cobertura",
+            )
+            fig_gantt.update_yaxes(autorange="reversed")
+            st.plotly_chart(fig_gantt, use_container_width=True)
+
+            st.markdown(
+                """
+                <div style="display:flex; gap:20px; margin-top:10px; font-size:0.85rem; color:#64748b;">
+                    <span><span style="color:#16a34a;">●</span> Verde: Stock suficiente (CUBRE)</span>
+                    <span><span style="color:#f59e0b;">●</span> Amarillo: Usar contingencia (CONTINGENCIA)</span>
+                    <span><span style="color:#dc2626;">●</span> Rojo: Riesgo ruptura (NO CUBRE)</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
