@@ -4,7 +4,7 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 
 ## Ultima actualizacion
 - Fecha de referencia: 2026-04-07
-- Contexto: se mejoro visualmente la pestaña `KDD Fase I - Ingesta` del dashboard Streamlit para que los barcos aparezcan navegando por el corredor marítimo Asia-Europa (no en puerto), se añadieron columnas de GPS y fecha de salida a la tabla de barcos, y se implemento un mapa de `Corredores Maritimos` con lineas de ruta. Servicios Docker actualmente levantados.
+- Contexto: se añadieron nuevas pestañas al dashboard Streamlit: 'Alertas y Contingencias' (visualización de alertas críticas, tabla de decisión, scatter plot de IA, mapa de contingencia multimodal), 'Impacto en Cliente' (stock Valladolid vs demanda Francia con Gantt de cobertura), 'KDD Fase II - Spark & MLlib' (simulador streaming + 3 modelos: K-Means, RandomForest, LinearRegression), y 'Análisis de Red (GraphFrames)' (fórmula de pesos dinámicos, visualización de grafo, nodos críticos y riesgo de rutas). Coordenadas GPS de barcos actualizadas en corredores marítimos.
 
 ## Resumen ejecutivo
 - El proyecto ya tiene una base funcional de demo: productores Kafka, landing raw en HDFS, jobs Spark batch, tablas Hive, soporte Cassandra, notebooks Zeppelin y un DAG de Airflow.
@@ -48,8 +48,12 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - Punto exacto de reanudacion: si el dashboard sale vacio, levantar `docker compose -f docker-compose.hdfs.yml up -d` y regenerar `dashboard_bundle_output.json` antes de abrir Streamlit.
 - El bundle del dashboard ya incorpora `eta_hours_estimate` por barco para conectar ETA con riesgo de stock y decisiones de contingencia.
 - Lo mas importante pendiente ahora es cerrar evidencias, Airflow visual, narrativa final de defensa y documentacion completa sobre la ruta Docker/local.
-- Se refinó la pestaña `KDD Fase I - Ingesta`: los barcos ahora aparecen en alta mar (corredor marítimo Asia-Europa) y no en coordenadas de puerto; la tabla de barcos incluye columnas `GPS (Lat, Lon)`, `Fecha de salida` y `Días de viaje`; se añadió un mapa `Corredores Marítimos` debajo de la tabla con líneas de colores por origen.
-- Servicios Docker están actualmente levantados (`docker-compose up -d`). Pendiente: ejecutar `spark-submit jobs/spark/99_dashboard_bundle.py` y lanzar `scripts/67_run_dashboard.sh` para validar los cambios.
+- Se añadieron nuevas pestañas al dashboard Streamlit:
+  - `10. Alertas y Contingencias`: Panel de alertas críticas (fact_alerts), tabla interactiva de decisión (fact_air_recovery_options), scatter plot de IA (coste vs tiempo), mapa de contingencia multimodal con rutas marítimas y desviaciones aéreas.
+  - `11. Impacto en Cliente`: Stock Valladolid (dim_articles_valladolid), pedidos cliente Francia (fact_customer_orders_douai), Gantt de cobertura por semanas industriales con estados CUBRE/CONTINGENCIA/NO_CUBRE.
+  - `KDD Fase II - Spark & MLlib` (mejora): Simulador de streaming con micro-batch de 15 min, K-Means (clustering puertos), RandomForest (feature importance alertas), LinearRegression (predicción ETA).
+  - `Análisis de Red (GraphFrames)` (mejora): Fórmula de pesos dinámicos P=T+(1/F)+Ra, visualización de grafo con nodos Asia/España/Francia, panel de nodos críticos (fact_graph_centrality), panel de riesgo de rutas (fact_route_risk).
+- Coordenadas GPS de barcos en Hive actualizadas a corredores marítimos reales (Mar Arábigo, Índico, Mediterráneo).
 
 ## Estado por fases KDD
 
