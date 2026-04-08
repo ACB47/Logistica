@@ -2482,13 +2482,168 @@ elif current_page == "8. Orquestacion":
     """)
 
 elif current_page == "9. Evidencias KDD":
-    st.subheader("Evidencias KDD")
-    render_diagram("Flujo KDD", "pipeline general", flow_diagram_svg())
-    render_diagram("Diagrama de Secuencia", "interaccion entre componentes", sequence_diagram_svg())
-    render_diagram("Diagrama de Clases", "modelo conceptual", class_diagram_svg())
-    render_diagram("Casos de Uso", "escenarios de defensa", use_case_diagram_svg())
+    st.subheader("Evidencias KDD - Defensa Académica")
+    st.caption("Portfolio técnico demostrando el ciclo de vida completo de datos")
+
+    st.markdown("""
+    Esta pestaña consolida las evidencias del proyecto para la defensa académica:
+    - ✅ Cumplimiento del ciclo KDD completo (5 fases)
+    - 📊 Modelos ML entrenados y evaluados
+    - 🔄 Múltiples formatos de persistencia (Parquet, JSONL, Cassandra)
+    - 📐 Diagramas UML y arquitectura del sistema
+    """)
+
+    st.markdown("#### 📊 KPIs de Resumen")
+    kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
+    with kpi_col1:
+        st.metric("Fases KDD Completadas", "5/5", "100%")
+    with kpi_col2:
+        st.metric("Modelos ML Entrenados", "3", "LR, RF, K-Means")
+    with kpi_col3:
+        st.metric("Formatos Persistencia", "4", "Parquet, JSONL, Cassandra")
+    with kpi_col4:
+        st.metric("DAGs Airflow", "2", "Microbatch + Monthly")
+
+    st.divider()
+
+    st.markdown("#### 🔄 El Flujo KDD - Línea Visual")
+
+    kdd_col1, kdd_col2, kdd_col3, kdd_col4, kdd_col5 = st.columns(5)
+
+    with kdd_col1:
+        st.markdown("""
+        <div style="background:#fef2f2; padding:15px; border-radius:10px; text-align:center; border:2px solid #dc2626;">
+            <b>1. SELECCIÓN</b><br>
+            <small>NiFi + Kafka</small><br>
+            <small>📥 Ingesta</small>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with kdd_col2:
+        st.markdown("""
+        <div style="background:#fffbeb; padding:15px; border-radius:10px; text-align:center; border:2px solid #f59e0b;">
+            <b>2. PREPROCESO</b><br>
+            <small>Spark SQL</small><br>
+            <small>🔧 Limpieza</small>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with kdd_col3:
+        st.markdown("""
+        <div style="background:#eff6ff; padding:15px; border-radius:10px; text-align:center; border:2px solid #2563eb;">
+            <b>3. TRANSFORMACIÓN</b><br>
+            <small>GraphFrames</small><br>
+            <small>🔗 Grafo</small>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with kdd_col4:
+        st.markdown("""
+        <div style="background:#f0fdf4; padding:15px; border-radius:10px; text-align:center; border:2px solid #16a34a;">
+            <b>4. MINERÍA</b><br>
+            <small>MLlib</small><br>
+            <small>🤖 Modelos</small>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with kdd_col5:
+        st.markdown("""
+        <div style="background:#f3e8ff; padding:15px; border-radius:10px; text-align:center; border:2px solid #9333ea;">
+            <b>5. INTERPRETACIÓN</b><br>
+            <small>Hive + Streamlit</small><br>
+            <small>📊 Dashboard</small>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.divider()
+
+    st.markdown("#### 📐 Visor Interactivo de Diagramas (UML)")
+
+    diagram_options = [
+        "Casos de Uso",
+        "Diagrama de Clases", 
+        "Diagrama de Secuencia",
+        "Arquitectura Lambda",
+    ]
+    selected_diagram = st.selectbox("Seleccionar diagrama a visualizar:", diagram_options, key="diagram_selector")
+
+    if selected_diagram == "Casos de Uso":
+        render_diagram("Casos de Uso", "escenarios de defensa", use_case_diagram_svg())
+    elif selected_diagram == "Diagrama de Clases":
+        render_diagram("Diagrama de Clases", "modelo conceptual", class_diagram_svg())
+    elif selected_diagram == "Diagrama de Secuencia":
+        render_diagram("Diagrama de Secuencia", "interaccion entre componentes", sequence_diagram_svg())
+    elif selected_diagram == "Arquitectura Lambda":
+        st.info("📂 Para mostrar el diagrama de Arquitectura Lambda, añade tu imagen en: `docs/img/arquitectura_lambda.png` y descomenta el siguiente código:")
+        st.code("# render_diagram('Arquitectura Lambda', 'arquitectura del sistema', '<svg>...</svg>')", language="python")
+
+    st.divider()
+
+    st.markdown("#### 🔍 Evidencias de Ingesta y Persistencia")
+
+    evidence_col1, evidence_col2 = st.columns(2)
+
+    with evidence_col1:
+        st.markdown("##### 📄 Export NiFi (JSON)")
+        st.caption("Simulación del flujo exportado desde docs/nifi/OpenMeteo_Kafka_Flow.json")
+
+        nifi_sample = '''{
+  "flow": {
+    "name": "OpenMeteo_Kafka_Flow",
+    "version": "1.0",
+    "processors": [
+      {
+        "id": "invokehttp-01",
+        "type": "InvokeHTTP",
+        "config": {
+          "URL": "https://api.open-meteo.com/v1/forecast",
+          "Method": "GET"
+        }
+      },
+      {
+        "id": "jolt-01",
+        "type": "JoltTransformJSON",
+        "config": {
+          "jolt-spec": "..."
+        }
+      },
+      {
+        "id": "publishkafka-01",
+        "type": "PublishKafka_2_6",
+        "config": {
+          "topic": "datos_crudos",
+          "bootstrap.servers": "kafka:9092"
+        }
+      }
+    ]
+  }
+}'''
+        st.code(nifi_sample, language="json")
+
+    with evidence_col2:
+        st.markdown("##### 📂 HDFS - Datos Raw")
+        st.caption("Simulación de hdfs dfs -ls /hadoop/logistica/raw/")
+
+        hdfs_df = pd.DataFrame({
+            "Propietario": ["jovyan"] * 6,
+            "Permisos": ["-rw-r-----"] * 6,
+            "Tamaño": ["45.2 MB", "32.1 MB", "28.5 MB", "51.3 MB", "18.7 MB", "22.4 MB"],
+            "Fecha Mod": ["2026-04-08", "2026-04-08", "2026-04-07", "2026-04-07", "2026-04-06", "2026-04-06"],
+            "Nombre": [
+                "weather_20260408.parquet",
+                "ships_gps_20260408.jsonl",
+                "weather_20260407.parquet",
+                "alerts_20260407.jsonl",
+                "weather_20260406.parquet",
+                "ships_gps_20260406.jsonl"
+            ]
+        })
+        st.dataframe(hdfs_df, use_container_width=True, hide_index=True, height=200)
+
     stock_df = build_stock_table(bundle)
     if not stock_df.empty:
+        st.divider()
+        st.markdown("#### 📋 Datos de Stock (Tabla Hive)")
         st.dataframe(stock_df, use_container_width=True, hide_index=True)
 
 elif current_page == "10. Alertas y Contingencias":
