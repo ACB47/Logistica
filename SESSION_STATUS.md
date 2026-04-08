@@ -4,7 +4,7 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 
 ## Ultima actualizacion
 - Fecha de referencia: 2026-04-08
-- Contexto: se anadio la pestaña 'Ejecución Contingencia Multimodal' con nombres reales de barcos (MSC Gülsün, CMA CGM Jacques Saade, Ever Golden, ONE Apus, Maersk Eindhoven), navieras, companias aereas y numeros de vuelo, y matriculas de camiones. Las leyendas de graficos fueron corregidas y el contenido de Impacto en Cliente se integro dentro de Control Tower Valladolid.
+- Contexto: se completaron todas las pestañas del dashboard Streamlit con diseño profesional: Control Tower con warehouse dashboard y seguimiento de flota, Persistencia con KPIs, graficos y catalogo de datos, Orquestacion con Airflow DAGs y timeline, y Evidencias KDD con KPIs, diagramas UML y evidencias de ingesta.
 
 ## Resumen ejecutivo
 - El proyecto ya tiene una base funcional de demo: productores Kafka, landing raw en HDFS, jobs Spark batch, tablas Hive, soporte Cassandra, notebooks Zeppelin y un DAG de Airflow.
@@ -57,6 +57,11 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - Barcos con nombres reales y navieras: MSC Gülsün (MSC), CMA CGM Jacques Saade (CMA CGM), Ever Golden (Evergreen), ONE Apus (ONE), Maersk Eindhoven (Maersk).
 - Coordenadas GPS de barcos en Hive actualizadas a corredores marítimos reales (Mar Arábigo, Índico, Mediterráneo).
 - Leyendas de graficos corregidas para mostrar nombres legibles en espanol.
+- Mejoras adicionales en el dashboard:
+  - `Control Tower Valladolid`: Warehouse dashboard con donut de capacidad y grafico de stock por categoria, seguimiento de flota con nombres reales de barcos, barra de progreso de trayecto y tabla de contingencia con estado CUBRE/NO CUBRE.
+  - `7. Persistencia`: KPIs (HDFS 2.4TB, 18 tablas Hive, 12ms latencia Cassandra), grafico de flujo de registros, donut de data lake y alertas, catalogo de 12 tablas, mapa de linaje Graphviz.
+  - `8. Orquestacion`: Panel de salud, timeline de DAG con px.timeline, donut de tasa de exito, historial de ejecuciones, enlace a consola Airflow.
+  - `9. Evidencias KDD`: KPIs de resumen (5 fases, 3 modelos, 4 formatos), linea visual del flujo KDD, selector de diagramas UML, export NiFi JSON, simulacion HDFS ls.
 
 ## Estado por fases KDD
 
