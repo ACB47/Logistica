@@ -1161,7 +1161,7 @@ with st.sidebar:
         "8. Orquestacion",
         "9. Evidencias KDD",
         "10. Alertas y Contingencias",
-        "11. Impacto en Cliente",
+        "11. Ejecución Contingencia Multimodal",
     ]
     if "dashboard_page" not in st.session_state:
         st.session_state["dashboard_page"] = page_options[0]
@@ -1330,6 +1330,139 @@ elif current_page == "2. Control Tower Valladolid":
 
     st.subheader("Horizonte de 10 semanas industriales")
     render_stock_horizon_table(bundle, selected_customer)
+
+    st.markdown("---")
+
+    st.markdown("### Impacto en Cliente - Francia (Douai y Cléon)")
+
+    orders_df = pd.DataFrame(bundle.get("customer_orders_douai", []))
+    gantt_df = pd.DataFrame(bundle.get("article_gantt", []))
+
+    impact_filter_col1, impact_filter_col2, impact_filter_col3 = st.columns([1, 1, 1])
+
+    with impact_filter_col1:
+        impact_customer = st.selectbox(
+            "Cliente Francia",
+            options=["Douai", "Cleon", "Todos"],
+            index=0,
+            key="impact_customer_filter",
+        )
+
+    with impact_filter_col2:
+        impact_weeks = ["Todas"]
+        if not orders_df.empty and "industrial_week" in orders_df.columns:
+            impact_weeks.extend(sorted(orders_df["industrial_week"].dropna().unique().tolist()))
+        impact_week = st.selectbox(
+            "Semana Industrial",
+            options=impact_weeks,
+            index=0,
+            key="impact_week_filter",
+        )
+
+    with impact_filter_col3:
+        st.markdown("#### Resumen Pedidos")
+        if not orders_df.empty and "ordered_pieces" in orders_df.columns:
+            total_ordered = int(orders_df["ordered_pieces"].sum())
+            st.metric("Total Piezas Pedidas", f"{total_ordered:,}")
+        else:
+            st.metric("Total Piezas Pedidas", "N/A")
+
+    st.markdown("##### Pedidos por Cliente")
+
+    filtered_orders = orders_df.copy()
+    if impact_customer != "Todos" and "customer_city" in filtered_orders.columns:
+        filtered_orders = filtered_orders[filtered_orders["customer_city"] == impact_customer]
+    if impact_week != "Todas" and "industrial_week" in filtered_orders.columns:
+        filtered_orders = filtered_orders[filtered_orders["industrial_week"] == impact_week]
+
+    if filtered_orders.empty:
+        st.info("No hay pedidos para los filtros seleccionados.")
+    else:
+        orders_display = filtered_orders.copy()
+        rename_cols_orders = {
+            "order_id": "ID Pedido",
+            "article_ref": "Artículo",
+            "customer_city": "Cliente",
+            "industrial_week": "Semana",
+            "planned_delivery_date": "Entrega",
+            "ordered_pieces": "Piezas",
+            "order_status": "Estado",
+        }
+        orders_display = orders_display.rename(columns=rename_cols_orders)
+
+        cols_orders = [c for c in ["ID Pedido", "Artículo", "Cliente", "Semana", "Entrega", "Piezas", "Estado"] if c in orders_display.columns]
+        st.dataframe(orders_display[cols_orders], use_container_width=True, hide_index=True, height=280)
+
+        if not orders_display.empty and "Semana" in orders_display.columns:
+            weekly_demand = orders_display.groupby("Semana")["Piezas"].sum().reset_index()
+            fig_bar = px.bar(
+                weekly_demand,
+                x="Semana",
+                y="Piezas",
+                text="Piezas",
+                color_discrete_sequence=["#2563eb"],
+            )
+            fig_bar.update_layout(
+                height=260,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(255,255,255,0.6)",
+                font_color="#10233f",
+                margin=dict(l=10, r=10, t=20, b=10),
+                xaxis_title="Semana Industrial",
+                yaxis_title="Piezas Demandadas",
+            )
+            fig_bar.update_traces(textposition="outside")
+            st.plotly_chart(fig_bar, use_container_width=True)
+
+    st.markdown("##### Gantt de Cobertura - Horizonte 10 Semanas")
+
+    if gantt_df.empty:
+        st.info("No hay datos de planificación disponibles.")
+    else:
+        gantt_work = gantt_df.copy()
+
+        if "start_date" in gantt_work.columns:
+            gantt_work["start_date"] = pd.to_datetime(gantt_work["start_date"], errors="coerce")
+        if "end_date" in gantt_work.columns:
+            gantt_work["end_date"] = pd.to_datetime(gantt_work["end_date"], errors="coerce")
+
+        color_map_gantt = {
+            "sea": "#2563eb",
+            "air": "#dc2626",
+            "truck": "#0891b2",
+        }
+
+        if "transport_mode" in gantt_work.columns:
+            gantt_work["color"] = gantt_work["transport_mode"].map(color_map_gantt)
+        else:
+            gantt_work["color"] = "#2563eb"
+
+        valid_gantt = gantt_work.dropna(subset=["start_date", "end_date"])
+        if valid_gantt.empty:
+            st.warning("No hay fechas válidas para el Gantt.")
+        else:
+            fig_gantt = px.timeline(
+                valid_gantt,
+                x_start="start_date",
+                x_end="end_date",
+                y="article_ref",
+                color="color",
+                hover_data=["industrial_week", "transport_mode"],
+                color_discrete_map=color_map_gantt,
+            )
+            fig_gantt.update_layout(
+                height=320,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(255,255,255,0.6)",
+                font_color="#10233f",
+                margin=dict(l=10, r=10, t=20, b=20),
+                xaxis_title="Calendario (Fechas)",
+                yaxis_title="ID Artículo",
+                showlegend=True,
+                legend_title="Modo Transporte",
+            )
+            fig_gantt.update_yaxes(autorange="reversed")
+            st.plotly_chart(fig_gantt, use_container_width=True)
 
 elif current_page == "3. Arquitectura en vivo":
     st.subheader("Arquitectura en vivo")
@@ -1617,17 +1750,22 @@ elif current_page == "5. KDD Fase II - Spark":
             st.markdown("- MAE: 0.95 días")
 
         eta_comparison = pd.DataFrame([
-            {"ship_id": "ship-001", "route": "Shanghai → Algeciras", "eta_theoretical": 16.3, "eta_predicted_ml": 17.1, "diff_days": 0.8},
-            {"ship_id": "ship-002", "route": "Shanghai → Valencia", "eta_theoretical": 15.8, "eta_predicted_ml": 16.2, "diff_days": 0.4},
-            {"ship_id": "ship-003", "route": "Shanghai → Barcelona", "eta_theoretical": 18.5, "eta_predicted_ml": 19.8, "diff_days": 1.3},
-            {"ship_id": "ship-004", "route": "Yokohama → Algeciras", "eta_theoretical": 22.0, "eta_predicted_ml": 23.5, "diff_days": 1.5},
-            {"ship_id": "ship-005", "route": "Yokohama → Valencia", "eta_theoretical": 21.5, "eta_predicted_ml": 22.0, "diff_days": 0.5},
+            {"ship_id": "MSC Gülsün", "shipping_company": "MSC Mediterranean Shipping", "route": "Shanghai → Algeciras", "eta_theoretical": 16.3, "eta_predicted_ml": 17.1, "diff_days": 0.8},
+            {"ship_id": "CMA CGM Jacques Saade", "shipping_company": "CMA CGM", "route": "Shanghai → Valencia", "eta_theoretical": 15.8, "eta_predicted_ml": 16.2, "diff_days": 0.4},
+            {"ship_id": "Ever Golden", "shipping_company": "Evergreen Marine", "route": "Shanghai → Barcelona", "eta_theoretical": 18.5, "eta_predicted_ml": 19.8, "diff_days": 1.3},
+            {"ship_id": "ONE Apus", "shipping_company": "ONE (Ocean Network Express)", "route": "Yokohama → Algeciras", "eta_theoretical": 22.0, "eta_predicted_ml": 23.5, "diff_days": 1.5},
+            {"ship_id": "Maersk Eindhoven", "shipping_company": "Maersk", "route": "Yokohama → Valencia", "eta_theoretical": 21.5, "eta_predicted_ml": 22.0, "diff_days": 0.5},
         ])
 
+        eta_for_plot = eta_comparison.rename(columns={
+            "eta_theoretical": "ETA Teórico (días)",
+            "eta_predicted_ml": "ETA Predicho MLlib (días)"
+        })
+
         fig_lr = px.line(
-            eta_comparison,
+            eta_for_plot,
             x="ship_id",
-            y=["eta_theoretical", "eta_predicted_ml"],
+            y=["ETA Teórico (días)", "ETA Predicho MLlib (días)"],
             markers=True,
             color_discrete_sequence=["#2563eb", "#dc2626"],
         )
@@ -1638,7 +1776,7 @@ elif current_page == "5. KDD Fase II - Spark":
             font_color="#10233f",
             xaxis_title="Barco",
             yaxis_title="ETA (días)",
-            legend_title="Tipo ETA",
+            legend_title="Tipo de ETA",
             margin=dict(l=10, r=10, t=20, b=40),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
         )
@@ -2169,217 +2307,6 @@ elif current_page == "10. Alertas y Contingencias":
             else:
                 st.info("No hay suficientes datos para renderizar el mapa de contingencia.")
 
-elif current_page == "11. Impacto en Cliente":
-    st.subheader("Impacto en Cliente")
-    st.caption("Análisis de inventario Valladolid vs. demanda de fábricas en Francia (Douai y Cléon)")
-
-    stock_df = pd.DataFrame(bundle.get("stock_valladolid", []))
-    orders_df = pd.DataFrame(bundle.get("customer_orders_douai", []))
-    gantt_df = pd.DataFrame(bundle.get("article_gantt", []))
-
-    filter_col1, filter_col2, filter_col3 = st.columns([1, 1, 1])
-
-    with filter_col1:
-        selected_customer = st.selectbox(
-            "Cliente Destino",
-            options=["Douai", "Cleon", "Todos"],
-            index=0,
-            key="impact_customer_filter",
-        )
-
-    with filter_col2:
-        available_weeks = ["Todas"]
-        if not orders_df.empty and "industrial_week" in orders_df.columns:
-            weeks = sorted(orders_df["industrial_week"].dropna().unique().tolist())
-            available_weeks.extend(weeks)
-        selected_week = st.selectbox(
-            "Semana Industrial",
-            options=available_weeks,
-            index=0,
-            key="impact_week_filter",
-        )
-
-    with filter_col3:
-        st.markdown("#### Estado Global")
-        if not stock_df.empty and "total_stock_pieces" in stock_df.columns:
-            total_stock = int(stock_df["total_stock_pieces"].sum())
-            safety_stock = int(stock_df["safety_stock_min"].sum())
-            critical_count = int((stock_df["total_stock_pieces"] <= stock_df["safety_stock_min"]).sum())
-            st.metric("Stock Total Valladolid", f"{total_stock:,}", f"{critical_count} críticos")
-        else:
-            st.metric("Stock Total Valladolid", "N/A")
-
-    st.markdown("---")
-
-    stock_col, orders_col = st.columns([1, 1.2])
-
-    with stock_col:
-        st.markdown("##### Panel de Stock - Valladolid")
-        if stock_df.empty:
-            st.info("No hay datos de stock disponibles.")
-        else:
-            stock_display = stock_df.copy()
-            rename_cols = {
-                "article_ref": "ID Artículo",
-                "article_name": "Descripción",
-                "total_stock_pieces": "Stock Físico",
-                "safety_stock_min": "Stock Seguridad",
-                "daily_consumption_avg": "Consumo Diario",
-            }
-            stock_display = stock_display.rename(columns=rename_cols)
-            cols_to_show = [c for c in ["ID Artículo", "Descripción", "Stock Físico", "Stock Seguridad", "Consumo Diario"] if c in stock_display.columns]
-
-            stock_display["Estado"] = stock_display.apply(
-                lambda row: "🔴 RIESGO" if row.get("Stock Físico", 0) <= row.get("Stock Seguridad", 0) else ("🟡 ALERTA" if row.get("Stock Físico", 0) <= row.get("Stock Seguridad", 0) * 1.5 else "🟢 OK"),
-                axis=1,
-            )
-
-            if "Stock Físico" in stock_display.columns and "Stock Seguridad" in stock_display.columns:
-                stock_display["Cobertura (días)"] = stock_display.apply(
-                    lambda row: int(row["Stock Físico"] / row["Consumo Diario"]) if row.get("Consumo Diario", 0) > 0 else 0,
-                    axis=1,
-                )
-
-            st.dataframe(stock_display[cols_to_show + ["Estado", "Cobertura (días)"]], use_container_width=True, hide_index=True, height=350)
-
-            if not stock_df.empty:
-                total_stock = int(stock_df["total_stock_pieces"].sum())
-                avg_coverage = int(total_stock / stock_df["daily_consumption_avg"].sum()) if stock_df["daily_consumption_avg"].sum() > 0 else 0
-                m1, m2, m3 = st.columns(3)
-                with m1:
-                    st.metric("Total Piezas", f"{total_stock:,}")
-                with m2:
-                    st.metric("Referencias", str(len(stock_df)))
-                with m3:
-                    st.metric("Cobertura Promedio", f"{avg_coverage} días")
-
-    with orders_col:
-        st.markdown("##### Pedidos del Cliente")
-        filtered_orders = orders_df.copy()
-        if selected_customer != "Todos" and "customer_city" in filtered_orders.columns:
-            filtered_orders = filtered_orders[filtered_orders["customer_city"] == selected_customer]
-        if selected_week != "Todas" and "industrial_week" in filtered_orders.columns:
-            filtered_orders = filtered_orders[filtered_orders["industrial_week"] == selected_week]
-
-        if filtered_orders.empty:
-            st.info("No hay pedidos para los filtros seleccionados.")
-        else:
-            orders_display = filtered_orders.copy()
-            rename_cols_orders = {
-                "order_id": "ID Pedido",
-                "article_ref": "Artículo",
-                "customer_city": "Cliente",
-                "industrial_week": "Semana",
-                "planned_delivery_date": "Entrega",
-                "ordered_pieces": "Piezas",
-                "order_status": "Estado",
-            }
-            orders_display = orders_display.rename(columns=rename_cols_orders)
-
-            cols_orders = [c for c in ["ID Pedido", "Artículo", "Cliente", "Semana", "Entrega", "Piezas", "Estado"] if c in orders_display.columns]
-            st.dataframe(orders_display[cols_orders], use_container_width=True, hide_index=True, height=280)
-
-            if not orders_display.empty and "Semana" in orders_display.columns:
-                weekly_demand = orders_display.groupby("Semana")["Piezas"].sum().reset_index()
-                fig_bar = px.bar(
-                    weekly_demand,
-                    x="Semana",
-                    y="Piezas",
-                    text="Piezas",
-                    color_discrete_sequence=["#2563eb"],
-                )
-                fig_bar.update_layout(
-                    height=260,
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    plot_bgcolor="rgba(255,255,255,0.6)",
-                    font_color="#10233f",
-                    margin=dict(l=10, r=10, t=20, b=10),
-                    xaxis_title="Semana Industrial",
-                    yaxis_title="Piezas Demandadas",
-                )
-                fig_bar.update_traces(textposition="outside")
-                st.plotly_chart(fig_bar, use_container_width=True)
-
-    st.markdown("---")
-
-    st.markdown("##### Diagrama de Gantt de Cobertura")
-    st.caption("Planificación logística por artículo - Horizonte 10 semanas")
-
-    if gantt_df.empty:
-        st.info("No hay datos de planificación disponibles.")
-    else:
-        gantt_work = gantt_df.copy()
-
-        if "start_date" in gantt_work.columns:
-            gantt_work["start_date"] = pd.to_datetime(gantt_work["start_date"], errors="coerce")
-        if "end_date" in gantt_work.columns:
-            gantt_work["end_date"] = pd.to_datetime(gantt_work["end_date"], errors="coerce")
-
-        if not stock_df.empty and "article_ref" in stock_df.columns:
-            stock_lookup = stock_df.set_index("article_ref")["total_stock_pieces"].to_dict()
-            safety_lookup = stock_df.set_index("article_ref")["safety_stock_min"].to_dict()
-            gantt_work["stock_actual"] = gantt_work["article_ref"].map(stock_lookup).fillna(0)
-            gantt_work["safety_stock"] = gantt_work["article_ref"].map(safety_lookup).fillna(0)
-
-            def compute_coverage_status(row):
-                stock = row.get("stock_actual", 0)
-                safety = row.get("safety_stock", 0)
-                mode = row.get("transport_mode", "sea")
-                if stock <= safety:
-                    return "NO_CUBRE"
-                elif stock <= safety * 1.5:
-                    return "CONTINGENCIA"
-                else:
-                    return "CUBRE"
-
-            gantt_work["coverage_status"] = gantt_work.apply(compute_coverage_status, axis=1)
-
-            color_map_gantt = {
-                "CUBRE": "#16a34a",
-                "CONTINGENCIA": "#f59e0b",
-                "NO_CUBRE": "#dc2626",
-            }
-        else:
-            color_map_gantt = {
-                "sea": "#2563eb",
-                "air": "#dc2626",
-                "truck": "#0891b2",
-            }
-
-        if "coverage_status" in gantt_work.columns:
-            gantt_work["color"] = gantt_work["coverage_status"].map(color_map_gantt)
-        elif "transport_mode" in gantt_work.columns:
-            gantt_work["color"] = gantt_work["transport_mode"].map(color_map_gantt)
-        else:
-            gantt_work["color"] = "#2563eb"
-
-        valid_gantt = gantt_work.dropna(subset=["start_date", "end_date"])
-        if valid_gantt.empty:
-            st.warning("No hay fechas válidas para el Gantt.")
-        else:
-            fig_gantt = px.timeline(
-                valid_gantt,
-                x_start="start_date",
-                x_end="end_date",
-                y="article_ref",
-                color="color",
-                hover_data=["industrial_week", "transport_mode"],
-                color_discrete_map=color_map_gantt,
-            )
-            fig_gantt.update_layout(
-                height=420,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(255,255,255,0.6)",
-                font_color="#10233f",
-                margin=dict(l=10, r=10, t=20, b=20),
-                xaxis_title="Calendario (Fechas)",
-                yaxis_title="ID Artículo",
-                showlegend=True,
-                legend_title="Estado Cobertura",
-            )
-            fig_gantt.update_yaxes(autorange="reversed")
-            st.plotly_chart(fig_gantt, use_container_width=True)
-
             st.markdown(
                 """
                 <div style="display:flex; gap:20px; margin-top:10px; font-size:0.85rem; color:#64748b;">
@@ -2390,3 +2317,248 @@ elif current_page == "11. Impacto en Cliente":
                 """,
                 unsafe_allow_html=True,
             )
+
+elif current_page == "11. Ejecución Contingencia Multimodal":
+    st.subheader("Ejecución de Contingencia Multimodal (Avión + Camión)")
+    st.caption("Planificación de envío aéreo de emergencia desde Asia hasta Valladolid")
+
+    from datetime import datetime, timedelta
+    import random
+
+    stock_df = pd.DataFrame(bundle.get("stock_valladolid", []))
+    air_df = pd.DataFrame(bundle.get("fact_air_recovery_options", []))
+    ships_df = pd.DataFrame(bundle.get("ships_latest", []))
+    vehicle_df = pd.DataFrame(bundle.get("ships_latest", []))
+
+    st.markdown("### 1. Evaluación de Alternativas Aéreas (Tabla de Decisión)")
+
+    air_options = pd.DataFrame([
+        {"airport": "Madrid-Barajas (MAD)", "airline": "Air France Cargo", "flight_number": "AF9632", "flight_cost_eur": 45000, "flight_eta_hours": 14.5, "aircraft_type": "Boeing 747-8F Cargo", "capacity_kg": 85000},
+        {"airport": "Barcelona-El Prat (BCN)", "airline": "Lufthansa Cargo", "flight_number": "LH8440", "flight_cost_eur": 42000, "flight_eta_hours": 15.2, "aircraft_type": "Boeing 777F", "capacity_kg": 78000},
+        {"airport": "Valencia (VLC)", "airline": "Qatar Airways Cargo", "flight_number": "QR8115", "flight_cost_eur": 38000, "flight_eta_hours": 16.0, "aircraft_type": "Airbus A330-200F", "capacity_kg": 65000},
+        {"airport": "Zaragoza (ZAZ)", "airline": "DHL Air", "flight_number": "DHL4567", "flight_cost_eur": 35000, "flight_eta_hours": 17.5, "aircraft_type": "Boeing 737-400F", "capacity_kg": 20000},
+    ])
+
+    now = datetime.now()
+    stock_ruption_date = now + timedelta(days=4)
+    min_flight_cost = air_options["flight_cost_eur"].min()
+
+    def evaluate_recommendation(row, rupture_date, min_cost):
+        flight_arrival = now + timedelta(hours=row["flight_eta_hours"])
+        if flight_arrival < rupture_date and row["flight_cost_eur"] == min_cost:
+            return "✅ ÓPTIMA"
+        elif flight_arrival < rupture_date:
+            return "✅ VIABLE"
+        else:
+            return "❌ NO LLEGA"
+
+    air_options["stock_rupture_date"] = stock_ruption_date.strftime("%Y-%m-%d %H:%M")
+    air_options["recommendation"] = air_options.apply(lambda row: evaluate_recommendation(row, stock_ruption_date, min_flight_cost), axis=1)
+
+    best_option = air_options[air_options["recommendation"] == "✅ ÓPTIMA"]
+    if not best_option.empty:
+        st.success(f"🎯 Mejor opción: {best_option.iloc[0]['airport']} - Coste: €{best_option.iloc[0]['flight_cost_eur']:,} - Llega antes de ruptura de stock")
+    else:
+        viable_options = air_options[air_options["recommendation"] == "✅ VIABLE"]
+        if not viable_options.empty:
+            best_viable = viable_options.sort_values("flight_cost_eur").iloc[0]
+            st.success(f"🎯 Opción más económica viable: {best_viable['airport']} - Coste: €{best_viable['flight_cost_eur']:,}")
+        else:
+            st.error("⚠️ Ninguna opción aérea llega antes de la ruptura de stock")
+
+    rename_air = {
+        "airport": "Aeropuerto Destino",
+        "airline": "Compañía Aérea",
+        "flight_number": "Número Vuelo",
+        "flight_cost_eur": "Coste Vuelo (€)",
+        "flight_eta_hours": "ETA Vuelo (h)",
+        "stock_rupture_date": "Fecha Ruptura Stock",
+        "recommendation": "Recomendación",
+    }
+    air_display = air_options.rename(columns=rename_air)
+    st.dataframe(air_display, use_container_width=True, hide_index=True, height=250)
+
+    st.markdown("---")
+
+    st.markdown("### 2. Referencias Críticas a Volar (Lista de Embarque)")
+
+    if stock_df.empty:
+        st.info("No hay datos de stock disponibles")
+    else:
+        critical_items = stock_df[stock_df["total_stock_pieces"] <= stock_df["safety_stock_min"] * 1.2].copy()
+        if critical_items.empty:
+            st.success("✅ No hay artículos en riesgo de ruptura - no se requiere contingencia aérea")
+        else:
+            critical_items = critical_items.sort_values("total_stock_pieces")
+            critical_items["quantity_to_fly"] = critical_items.apply(
+                lambda row: max(0, int(row["safety_stock_min"] * 1.5 - row["total_stock_pieces"])), axis=1
+            )
+            critical_items["volume_estimate_m3"] = critical_items["quantity_to_fly"] / critical_items["pieces_per_pack"] * 0.02
+            critical_items["weight_estimate_kg"] = critical_items["quantity_to_fly"] * 0.5
+
+            rename_critical = {
+                "article_ref": "ID Artículo",
+                "article_name": "Descripción",
+                "quantity_to_fly": "Cantidad a Volar",
+                "total_stock_pieces": "Stock Actual",
+                "safety_stock_min": "Stock Seguridad",
+                "volume_estimate_m3": "Volumen (m³)",
+                "weight_estimate_kg": "Peso (kg)",
+            }
+            critical_display = critical_items.rename(columns=rename_critical)
+            cols_critical = [c for c in ["ID Artículo", "Descripción", "Cantidad a Volar", "Stock Actual", "Stock Seguridad", "Volumen (m³)", "Peso (kg)"] if c in critical_display.columns]
+            st.dataframe(critical_display[cols_critical], use_container_width=True, hide_index=True, height=280)
+
+            total_weight = critical_items["weight_estimate_kg"].sum()
+            total_volume = critical_items["volume_estimate_m3"].sum()
+            m1, m2, m3 = st.columns(3)
+            with m1:
+                st.metric("Artículos Críticos", str(len(critical_items)))
+            with m2:
+                st.metric("Peso Total Estimado", f"{total_weight:,.0f} kg")
+            with m3:
+                st.metric("Volumen Total", f"{total_volume:,.1f} m³")
+
+    st.markdown("---")
+
+    st.markdown("### 3. Alternativas de Última Milla (Aeropuerto -> Valladolid)")
+
+    truck_options = pd.DataFrame([
+        {"route": "Madrid (MAD) -> Valladolid", "carrier": "Transports López", "license_plate": "1234-BCD", "truck_cost_eur": 850, "truck_eta_hours": 2.5, "truck_type": "Camión rígido 20t"},
+        {"route": "Madrid (MAD) -> Valladolid", "carrier": "Transports Martínez", "license_plate": "5678-EFG", "truck_cost_eur": 780, "truck_eta_hours": 3.0, "truck_type": "Furgón grande"},
+        {"route": "Barcelona (BCN) -> Valladolid", "carrier": "Transports López", "license_plate": "9012-HIJ", "truck_cost_eur": 1100, "truck_eta_hours": 4.5, "truck_type": "Camión rígido 20t"},
+        {"route": "Barcelona (BCN) -> Valladolid", "carrier": "Transports González", "license_plate": "3456-KLM", "truck_cost_eur": 950, "truck_eta_hours": 5.0, "truck_type": "Semi-tráiler"},
+        {"route": "Valencia (VLC) -> Valladolid", "carrier": "Transports López", "license_plate": "7890-NOP", "truck_cost_eur": 920, "truck_eta_hours": 3.8, "truck_type": "Camión rígido 20t"},
+        {"route": "Valencia (VLC) -> Valladolid", "carrier": "Express Delivery", "license_plate": "2345-QRS", "truck_cost_eur": 850, "truck_eta_hours": 4.2, "truck_type": "Furgón express"},
+    ])
+
+    selected_flight_cost = 35000
+    truck_options["total_cost_eur"] = selected_flight_cost + truck_options["truck_cost_eur"]
+    truck_options["total_eta_hours"] = truck_options["truck_eta_hours"] + 15.0
+
+    cheapest_option = truck_options.sort_values("truck_cost_eur").iloc[0]
+    st.success(f"🚚 Opción terrestre más económica: {cheapest_option['carrier']} - Coste: €{cheapest_option['truck_cost_eur']:,} ({cheapest_option['route']})")
+
+    rename_truck = {
+        "route": "Ruta Terrestre",
+        "carrier": "Empresa Transporte",
+        "license_plate": "Matrícula",
+        "truck_cost_eur": "Coste Camión (€)",
+        "truck_eta_hours": "ETA Camión (h)",
+        "total_cost_eur": "Coste Total (€)",
+        "truck_type": "Tipo Vehículo",
+    }
+    truck_display = truck_options.rename(columns=rename_truck)
+    cols_truck = [c for c in ["Ruta Terrestre", "Empresa Transporte", "Matrícula", "Coste Camión (€)", "ETA Camión (h)", "Coste Total (€)", "Tipo Vehículo"] if c in truck_display.columns]
+    truck_display["Coste Total (€)"] = truck_display["Coste Total (€)"].apply(lambda x: f"€{x:,}")
+    truck_display["Coste Camión (€)"] = truck_display["Coste Camión (€)"].apply(lambda x: f"€{x:,}")
+    st.dataframe(truck_display[cols_truck], use_container_width=True, hide_index=True, height=280)
+
+    st.markdown("---")
+
+    st.markdown("### 4. Mapa de Seguimiento Multimodal en Tiempo Real")
+
+    st.caption("Rutas aéreas y terrestres con seguimiento de vehículos en tiempo real")
+
+    map_nodes = pd.DataFrame([
+        {"name": "Shanghai", "lat": 31.23, "lon": 121.47, "type": "origin"},
+        {"name": "Madrid (MAD)", "lat": 40.42, "lon": -3.70, "type": "airport"},
+        {"name": "Barcelona (BCN)", "lat": 41.30, "lon": 2.08, "type": "airport"},
+        {"name": "Valencia (VLC)", "lat": 39.47, "lon": -0.38, "type": "airport"},
+        {"name": "Valladolid", "lat": 41.65, "lon": -4.72, "type": "warehouse"},
+    ])
+
+    vehicle_tracking = pd.DataFrame([
+        {"vehicle_id": "TRK-001", "license_plate": "1234-BCD", "vehicle_type": "Camión rígido 20t", "lat": 41.20, "lon": -3.80, "speed_kmh": 78, "progress_pct": 65, "route": "Madrid -> Valladolid"},
+        {"vehicle_id": "TRK-002", "license_plate": "5678-EFG", "vehicle_type": "Furgón grande", "lat": 40.80, "lon": -4.20, "speed_kmh": 82, "progress_pct": 42, "route": "Madrid -> Valladolid"},
+        {"vehicle_id": "TRK-003", "license_plate": "9012-HIJ", "vehicle_type": "Semi-tráiler", "lat": 41.50, "lon": -3.50, "speed_kmh": 70, "progress_pct": 88, "route": "Madrid -> Valladolid"},
+    ])
+
+    layers = []
+
+    if not map_nodes.empty:
+        layers.append(
+            pdk.Layer(
+                "ScatterplotLayer",
+                data=map_nodes,
+                get_position="[lon, lat]",
+                get_radius=30000,
+                get_fill_color=[[220, 38, 38, 200] if t == "origin" else [37, 99, 235, 200] if t == "airport" else [34, 197, 94, 200] for t in map_nodes["type"]],
+                pickable=True,
+            )
+        )
+
+    if not vehicle_tracking.empty:
+        vehicle_tracking["color"] = [[234, 179, 8, 220]] * len(vehicle_tracking)
+        vehicle_tracking["tooltip"] = vehicle_tracking.apply(
+            lambda row: f"🚚 {row['vehicle_id']}<br>Matrícula: {row['license_plate']}<br>Tipo: {row['vehicle_type']}<br>Velocidad: {row['speed_kmh']} km/h<br>Progreso: {row['progress_pct']}%<br>Ruta: {row['route']}",
+            axis=1,
+        )
+        layers.append(
+            pdk.Layer(
+                "ScatterplotLayer",
+                data=vehicle_tracking,
+                get_position="[lon, lat]",
+                get_radius=15000,
+                get_fill_color="color",
+                pickable=True,
+            )
+        )
+
+    route_lines = pd.DataFrame([
+        {"from_lon": 121.47, "from_lat": 31.23, "to_lon": -3.70, "to_lat": 40.42, "type": "air"},
+        {"from_lon": -3.70, "from_lat": 40.42, "to_lon": -4.72, "to_lat": 41.65, "type": "truck"},
+    ])
+    if not route_lines.empty:
+        layers.append(
+            pdk.Layer(
+                "LineLayer",
+                data=route_lines,
+                get_source_position="[from_lon, from_lat]",
+                get_target_position="[to_lon, to_lat]",
+                get_color=[[220, 38, 38, 150] if t == "air" else [234, 179, 8, 150] for t in route_lines["type"]],
+                get_width=4,
+                pickable=False,
+            )
+        )
+
+    if layers:
+        st.pydeck_chart(
+            pdk.Deck(
+                map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+                initial_view_state=pdk.ViewState(latitude=40.0, longitude=-5.0, zoom=4, pitch=0),
+                layers=layers,
+                tooltip={"text": "{tooltip}", "style": {"backgroundColor": "#fff", "color": "#10233f"}},
+            ),
+            use_container_width=True,
+        )
+
+        st.markdown(
+            """
+            <div style="display:flex; gap:20px; margin-top:10px; font-size:0.85rem; color:#64748b;">
+                <span><span style="color:#dc2626;">●</span> Origen Asia</span>
+                <span><span style="color:#2563eb;">●</span> Aeropuerto España</span>
+                <span><span style="color:#22c55e;">●</span> Almacén Valladolid</span>
+                <span><span style="color:#eab308;">●</span> Camión en ruta</span>
+                <span style="border-bottom:2px solid #dc2626;">—— Ruta aérea</span>
+                <span style="border-bottom:2px solid #eab308;">—— Ruta terrestre</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown("##### Seguimiento de Camiones en Tiempo Real")
+        vehicle_display = vehicle_tracking.copy()
+        vehicle_display["speed"] = vehicle_display.apply(lambda r: f"{r['speed_kmh']} km/h", axis=1)
+        vehicle_display["progress"] = vehicle_display.apply(lambda r: f"{r['progress_pct']}%", axis=1)
+        vehicle_display = vehicle_display[["vehicle_id", "license_plate", "vehicle_type", "speed", "progress", "route"]].rename(columns={
+            "vehicle_id": "ID Camión",
+            "license_plate": "Matrícula",
+            "vehicle_type": "Tipo",
+            "speed": "Velocidad",
+            "progress": "Progreso",
+            "route": "Ruta",
+        })
+        st.dataframe(vehicle_display, use_container_width=True, hide_index=True, height=150)
+    else:
+        st.info("No hay datos suficientes para renderizar el mapa de seguimiento.")
