@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 from datetime import datetime, timedelta
 from math import isnan
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import smtplib
 
 import pandas as pd
 import plotly.express as px
@@ -166,6 +170,94 @@ def render_panel(title: str, subtitle: str, body: str, height: int = 230) -> Non
         """,
         height=height,
     )
+
+
+def send_critical_alerts_email(alerts_data: list[dict]) -> tuple[bool, str]:
+    """
+    Envía un correo electrónico con las alertas críticas de referencias en rotación de stock.
+    
+    Args:
+        alerts_data: Lista de diccionarios con información de las alertas críticas.
+        
+    Returns:
+        Tuple de (éxito: bool, mensaje: str)
+    """
+    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+    recipient_email = os.getenv("SMTP_RECIPIENT", "planificacion@logistica.com")
+    
+    if not smtp_user or not smtp_password:
+        return False, "Falta configurar el SMTP en el archivo .env"
+    
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = smtp_user
+        msg["To"] = recipient_email
+        msg["Subject"] = "🚨 ALERTA: Referencias Críticas - Riesgo de Rotura de Stock"
+        
+        body = """<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #dc2626; color: white; }
+        .critical { background-color: #fef2f2; }
+        .warning { background-color: #fffbeb; }
+    </style>
+</head>
+<body>
+    <h2>🚨 Alerta de Referencias Críticas</h2>
+    <p>Se han detectado las siguientes referencias en riesgo de rotación de stock:</p>
+    <table>
+        <tr>
+            <th>ID Artículo</th>
+            <th>Descripción</th>
+            <th>Stock Actual</th>
+            <th>Stock Mínimo</th>
+            <th>Estado</th>
+        </tr>
+"""
+        
+        for alert in alerts_data:
+            article_ref = alert.get("article_ref", "N/A")
+            article_name = alert.get("article_name", "Sin descripción")
+            stock_actual = alert.get("total_stock_pieces", 0)
+            stock_minimo = alert.get("safety_stock_min", 0)
+            estado = alert.get("stock_status", "CRÍTICO")
+            
+            row_class = "critical" if stock_actual <= stock_minimo else "warning"
+            body += f"""        <tr class="{row_class}">
+            <td>{article_ref}</td>
+            <td>{article_name}</td>
+            <td>{stock_actual}</td>
+            <td>{stock_minimo}</td>
+            <td>{estado}</td>
+        </tr>
+"""
+        
+        body += """    </table>
+    <p><strong>Nota:</strong> Se recomienda revisar el plan de contingencia aérea para estas referencias.</p>
+    <hr>
+    <p><small>Este correo fue enviado automáticamente desde el sistema de monitoreo logístico.</small></p>
+</body>
+</html>"""
+        
+        msg.attach(MIMEText(body, "html"))
+        
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(smtp_user, smtp_password)
+        server.send_message(msg)
+        server.quit()
+        
+        return True, f"Correo enviado correctamente a {recipient_email}"
+        
+    except Exception as e:
+        return False, f"Error al enviar correo: {str(e)}"
 
 
 def render_diagram(title: str, subtitle: str, svg: str, height: int = 420) -> None:
@@ -1356,6 +1448,44 @@ elif current_page == "2. Control Tower Valladolid":
             st.plotly_chart(fig_stock, use_container_width=True)
         else:
             st.info("No hay datos de stock por categoría")
+
+    st.markdown("---")
+
+    st.markdown("#### ⚡ Acciones Rápidas")
+
+    if not stock_valladolid_df.empty and "total_stock_pieces" in stock_valladolid_df.columns:
+        critical_count = int((stock_valladolid_df["total_stock_pieces"] <= stock_valladolid_df["safety_stock_min"]).sum())
+    else:
+        critical_count = 0
+
+    action_col1, action_col2 = st.columns([1, 2])
+
+    with action_col1:
+        st.metric("Referencias en Riesgo", f"{critical_count}", f"{int(critical_count * 0.3)} requieren acción")
+
+    with action_col2:
+        if st.button("✉️ Enviar Alertas de Referencias Críticas", type="primary", use_container_width=True):
+            with st.spinner("Conectando al servidor SMTP y enviando alertas..."):
+                stock_data = pd.DataFrame(bundle.get("stock_valladolid", []))
+                
+                if stock_data.empty:
+                    st.error("No hay datos de stock disponibles para enviar alertas.")
+                else:
+                    critical_items = stock_data[
+                        stock_data["total_stock_pieces"] <= stock_data["safety_stock_min"]
+                    ].copy()
+                    
+                    if critical_items.empty:
+                        st.warning("No hay referencias en riesgo crítico para enviar.")
+                    else:
+                        alerts_for_email = critical_items.to_dict("records")
+                        success, message = send_critical_alerts_email(alerts_for_email)
+                        
+                        if success:
+                            st.balloons()
+                            st.success(f"✉️ {message}")
+                        else:
+                            st.error(f"⚠️ {message}")
 
     st.markdown("---")
 
@@ -3184,3 +3314,91 @@ elif current_page == "11. Ejecución Contingencia Multimodal":
         st.dataframe(vehicle_display, use_container_width=True, hide_index=True, height=150)
     else:
         st.info("No hay datos suficientes para renderizar el mapa de seguimiento.")
+
+
+def send_critical_alerts_email(alerts_data: list[dict]) -> tuple[bool, str]:
+    """
+    Envía un correo electrónico con las alertas críticas de referencias en rotación de stock.
+    
+    Args:
+        alerts_data: Lista de diccionarios con información de las alertas críticas.
+        
+    Returns:
+        Tuple de (éxito: bool, mensaje: str)
+    """
+    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+    recipient_email = os.getenv("SMTP_RECIPIENT", "planificacion@logistica.com")
+    
+    if not smtp_user or not smtp_password:
+        return False, "Falta configurar el SMTP en el archivo .env"
+    
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = smtp_user
+        msg["To"] = recipient_email
+        msg["Subject"] = "🚨 ALERTA: Referencias Críticas - Riesgo de Rotura de Stock"
+        
+        body = """<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #dc2626; color: white; }
+        .critical { background-color: #fef2f2; }
+        .warning { background-color: #fffbeb; }
+    </style>
+</head>
+<body>
+    <h2>🚨 Alerta de Referencias Críticas</h2>
+    <p>Se han detectado las siguientes referencias en riesgo de rotación de stock:</p>
+    <table>
+        <tr>
+            <th>ID Artículo</th>
+            <th>Descripción</th>
+            <th>Stock Actual</th>
+            <th>Stock Mínimo</th>
+            <th>Estado</th>
+        </tr>
+"""
+        
+        for alert in alerts_data:
+            article_ref = alert.get("article_ref", "N/A")
+            article_name = alert.get("article_name", "Sin descripción")
+            stock_actual = alert.get("total_stock_pieces", 0)
+            stock_minimo = alert.get("safety_stock_min", 0)
+            estado = alert.get("stock_status", "CRÍTICO")
+            
+            row_class = "critical" if stock_actual <= stock_minimo else "warning"
+            body += f"""        <tr class="{row_class}">
+            <td>{article_ref}</td>
+            <td>{article_name}</td>
+            <td>{stock_actual}</td>
+            <td>{stock_minimo}</td>
+            <td>{estado}</td>
+        </tr>
+"""
+        
+        body += """    </table>
+    <p><strong>Nota:</strong> Se recomienda revisar el plan de contingencia aérea para estas referencias.</p>
+    <hr>
+    <p><small>Este correo fue enviado automáticamente desde el sistema de monitoreo logístico.</small></p>
+</body>
+</html>"""
+        
+        msg.attach(MIMEText(body, "html"))
+        
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(smtp_user, smtp_password)
+        server.send_message(msg)
+        server.quit()
+        
+        return True, f"Correo enviado correctamente a {recipient_email}"
+        
+    except Exception as e:
+        return False, f"Error al enviar correo: {str(e)}"
