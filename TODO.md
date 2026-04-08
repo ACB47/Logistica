@@ -158,7 +158,7 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
   - [x] HDFS curated.
   - [x] GraphFrames resultados.
   - [x] Airflow DAG.
-  - [ ] Dashboard final con stock Valladolid, pedidos Douai y Gantt.
+  - [x] Dashboard final con stock Valladolid, pedidos Douai y Gantt.
 - [ ] Explicar claramente que parte esta implementada de verdad y que parte es simulada.
 - [ ] Redactar conclusiones, limitaciones y mejoras futuras.
 
@@ -186,6 +186,6 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [x] DAG Airflow ejecutado con exito y capturado.
 - [x] Al menos una alerta operativa generada y registrada.
 - [x] Rebuild tecnico reproducible tras reinicio validado.
-- [ ] Dashboard final ensayado y legible en exposicion.
+- [x] Dashboard final ensayado y legible en exposicion.
 - [ ] Memoria completa con capturas.
 - [ ] Demo final ensayada.

@@ -3,8 +3,8 @@
 Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el repo.
 
 ## Ultima actualizacion
-- Fecha de referencia: 2026-04-07
-- Contexto: se añadieron nuevas pestañas al dashboard Streamlit: 'Alertas y Contingencias' (visualización de alertas críticas, tabla de decisión, scatter plot de IA, mapa de contingencia multimodal), 'Impacto en Cliente' (stock Valladolid vs demanda Francia con Gantt de cobertura), 'KDD Fase II - Spark & MLlib' (simulador streaming + 3 modelos: K-Means, RandomForest, LinearRegression), y 'Análisis de Red (GraphFrames)' (fórmula de pesos dinámicos, visualización de grafo, nodos críticos y riesgo de rutas). Coordenadas GPS de barcos actualizadas en corredores marítimos.
+- Fecha de referencia: 2026-04-08
+- Contexto: se anadio la pestaña 'Ejecución Contingencia Multimodal' con nombres reales de barcos (MSC Gülsün, CMA CGM Jacques Saade, Ever Golden, ONE Apus, Maersk Eindhoven), navieras, companias aereas y numeros de vuelo, y matriculas de camiones. Las leyendas de graficos fueron corregidas y el contenido de Impacto en Cliente se integro dentro de Control Tower Valladolid.
 
 ## Resumen ejecutivo
 - El proyecto ya tiene una base funcional de demo: productores Kafka, landing raw en HDFS, jobs Spark batch, tablas Hive, soporte Cassandra, notebooks Zeppelin y un DAG de Airflow.
@@ -50,10 +50,13 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - Lo mas importante pendiente ahora es cerrar evidencias, Airflow visual, narrativa final de defensa y documentacion completa sobre la ruta Docker/local.
 - Se añadieron nuevas pestañas al dashboard Streamlit:
   - `10. Alertas y Contingencias`: Panel de alertas críticas (fact_alerts), tabla interactiva de decisión (fact_air_recovery_options), scatter plot de IA (coste vs tiempo), mapa de contingencia multimodal con rutas marítimas y desviaciones aéreas.
-  - `11. Impacto en Cliente`: Stock Valladolid (dim_articles_valladolid), pedidos cliente Francia (fact_customer_orders_douai), Gantt de cobertura por semanas industriales con estados CUBRE/CONTINGENCIA/NO_CUBRE.
+  - `11. Ejecución Contingencia Multimodal`: Evaluación de alternativas aéreas con compañías y números de vuelo, referencias críticas a volar, alternativas de última milla con matriculas de camiones, mapa de seguimiento multimodal en tiempo real.
   - `KDD Fase II - Spark & MLlib` (mejora): Simulador de streaming con micro-batch de 15 min, K-Means (clustering puertos), RandomForest (feature importance alertas), LinearRegression (predicción ETA).
   - `Análisis de Red (GraphFrames)` (mejora): Fórmula de pesos dinámicos P=T+(1/F)+Ra, visualización de grafo con nodos Asia/España/Francia, panel de nodos críticos (fact_graph_centrality), panel de riesgo de rutas (fact_route_risk).
+- El contenido de 'Impacto en Cliente' se integro dentro de la pestaña 'Control Tower Valladolid' para mejor cohesion.
+- Barcos con nombres reales y navieras: MSC Gülsün (MSC), CMA CGM Jacques Saade (CMA CGM), Ever Golden (Evergreen), ONE Apus (ONE), Maersk Eindhoven (Maersk).
 - Coordenadas GPS de barcos en Hive actualizadas a corredores marítimos reales (Mar Arábigo, Índico, Mediterráneo).
+- Leyendas de graficos corregidas para mostrar nombres legibles en espanol.
 
 ## Estado por fases KDD
 
