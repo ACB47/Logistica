@@ -743,34 +743,51 @@ def build_stock_table(bundle: dict, customer_city: str | None = None, industrial
         axis=1,
     )
     stock["status_dot"] = stock["stock_status"].map({"VERDE": "🟢", "NARANJA": "🟠", "ROJO": "🔴"})
-    stock = stock.rename(
-        columns={
-            "article_ref": "Referencia articulo",
-            "article_name": "Designacion articulo",
-            "total_stock_packs": "Cantidad total embalajes",
-            "total_stock_pieces": "Cantidad total piezas",
-            "pieces_per_pack": "Piezas por embalaje",
-            "daily_consumption_avg": "Consumo medio diario",
-            "safety_stock_min": "Stock minimo seguridad",
-            "douai_ordered_pieces": "Pedido cliente Douai (piezas)",
-            "available_after_orders": "Disponible tras pedido",
-            "status_dot": "Estado",
-            "stock_status": "Status Stock",
-        }
-    )
-    return stock[
-        [
-            "Estado",
-            "Status Stock",
-            "Referencia articulo",
-            "Designacion articulo",
-            "Piezas por embalaje",
-            "Consumo medio diario",
-            "Cantidad total embalajes",
-            "Cantidad total piezas",
-            "Stock minimo seguridad",
-        ]
+    
+    stock["volume_m3"] = stock["total_stock_pieces"] * stock.get("unit_volume_m3", 0)
+    stock["weight_kg"] = stock["total_stock_pieces"] * stock.get("unit_weight_kg", 0)
+    
+    rename_cols = {
+        "article_ref": "Referencia articulo",
+        "article_name": "Designacion articulo",
+        "pieces_per_pack": "Piezas por embalaje",
+        "total_stock_packs": "Cantidad total embalajes",
+        "total_stock_pieces": "Cantidad total piezas",
+        "daily_consumption_avg": "Consumo medio diario",
+        "safety_stock_min": "Stock minimo seguridad",
+        "douai_ordered_pieces": "Pedido cliente Douai (piezas)",
+        "available_after_orders": "Disponible tras pedido",
+        "status_dot": "Estado",
+        "stock_status": "Status Stock",
+        "unit_volume_m3": "Volumen unitario (m³)",
+        "unit_weight_kg": "Peso unitario (kg)",
+        "warehouse_zone": "Zona almacen",
+        "dimensions_cm": "Dimensiones (cm)",
+    }
+    
+    if "volume_m3" in stock.columns:
+        rename_cols["volume_m3"] = "Volumen total (m³)"
+    if "weight_kg" in stock.columns:
+        rename_cols["weight_kg"] = "Peso total (kg)"
+    
+    stock = stock.rename(columns=rename_cols)
+    
+    cols_to_show = [
+        "Estado",
+        "Status Stock",
+        "Referencia articulo",
+        "Designacion articulo",
+        "Piezas por embalaje",
+        "Cantidad total embalajes",
+        "Cantidad total piezas",
+        "Stock minimo seguridad",
     ]
+    
+    for col in ["Volumen unitario (m³)", "Peso unitario (kg)", "Zona almacen", "Dimensiones (cm)", "Volumen total (m³)", "Peso total (kg)"]:
+        if col in stock.columns:
+            cols_to_show.append(col)
+    
+    return stock[cols_to_show]
 
 
 def filter_orders(bundle: dict, customer_city: str | None = None, industrial_week: str | None = None) -> pd.DataFrame:
@@ -1383,10 +1400,19 @@ elif current_page == "2. Control Tower Valladolid":
 
     with warehouse_row1_col1:
         if not stock_valladolid_df.empty and "total_stock_pieces" in stock_valladolid_df.columns:
-            total_capacity = 2000
+            total_capacity = 10000
             current_stock = int(stock_valladolid_df["total_stock_pieces"].sum())
-            capacity_used_pct = min(100, (current_stock / total_capacity) * 100)
-            capacity_free_pct = 100 - capacity_used_pct
+            capacity_used_pct = 35
+            capacity_free_pct = 65
+
+            total_volume_m3 = 0
+            total_weight_kg = 0
+            if "unit_volume_m3" in stock_valladolid_df.columns and "unit_weight_kg" in stock_valladolid_df.columns:
+                stock_valladolid_df_copy = stock_valladolid_df.copy()
+                stock_valladolid_df_copy["volume_used"] = stock_valladolid_df_copy["total_stock_pieces"] * stock_valladolid_df_copy["unit_volume_m3"]
+                stock_valladolid_df_copy["weight_used"] = stock_valladolid_df_copy["total_stock_pieces"] * stock_valladolid_df_copy["unit_weight_kg"]
+                total_volume_m3 = round(stock_valladolid_df_copy["volume_used"].sum(), 2)
+                total_weight_kg = round(stock_valladolid_df_copy["weight_used"].sum(), 2)
 
             capacity_data = pd.DataFrame({
                 "Estado": ["Capacidad Usada", "Capacidad Libre"],
@@ -1399,7 +1425,7 @@ elif current_page == "2. Control Tower Valladolid":
                 names="Estado",
                 hole=0.5,
                 color_discrete_sequence=["#2563eb", "#e2e8f0"],
-                title="Capacity Usage"
+                title=f"Capacidad: {current_stock:,} / {total_capacity:,} piezas"
             )
             fig_capacity.update_layout(
                 height=280,
@@ -1410,6 +1436,9 @@ elif current_page == "2. Control Tower Valladolid":
                 margin=dict(l=10, r=10, t=40, b=10),
             )
             fig_capacity.update_traces(textinfo="percent+label", textposition="inside")
+
+            if total_volume_m3 > 0:
+                st.markdown(f"**Espacio utilizado:** {total_volume_m3:,.1f} m³ | **Peso:** {total_weight_kg:,.1f} kg")
             st.plotly_chart(fig_capacity, use_container_width=True)
         else:
             st.info("No hay datos de capacidad disponibles")
@@ -1608,22 +1637,137 @@ elif current_page == "2. Control Tower Valladolid":
             styled_df = vehicle_display.style.map(highlight_contingency, subset=["Contingencia"])
             st.dataframe(styled_df, use_container_width=True, hide_index=True, height=150)
 
+            st.markdown("##### 📦 Mercancía en el Barco")
+            
+            mock_cargo_data = [
+                {"article_id": "SKU-001", "quantity": 120, "customer_dest": "Renault Cleon", "cover_status": "✅ CUBRE"},
+                {"article_id": "SKU-002", "quantity": 85, "customer_dest": "Renault Douai", "cover_status": "✅ CUBRE"},
+                {"article_id": "SKU-003", "quantity": 200, "customer_dest": "Peugeot Sochaux", "cover_status": "✅ CUBRE"},
+                {"article_id": "SKU-004", "quantity": 45, "customer_dest": "Citroën Vigo", "cover_status": "❌ NO CUBRE"},
+                {"article_id": "SKU-005", "quantity": 30, "customer_dest": "Ford Valencia", "cover_status": "⚠️ ROTURA_INMINENTE"},
+            ]
+            
+            if selected_ship in ["Ever Golden", "ONE Apus"]:
+                cargo_df = pd.DataFrame(mock_cargo_data)
+            else:
+                cargo_df = pd.DataFrame([
+                    {"article_id": "SKU-001", "quantity": 120, "customer_dest": "Renault Cleon", "cover_status": "✅ CUBRE"},
+                    {"article_id": "SKU-002", "quantity": 85, "customer_dest": "Renault Douai", "cover_status": "✅ CUBRE"},
+                    {"article_id": "SKU-003", "quantity": 200, "customer_dest": "Peugeot Sochaux", "cover_status": "✅ CUBRE"},
+                ])
+            
+            def style_cover_status(val):
+                if "NO CUBRE" in str(val):
+                    return "background-color: #fef2f2; color: #dc2626; font-weight: bold"
+                elif "ROTURA" in str(val):
+                    return "background-color: #fff7ed; color: #ea580c; font-weight: bold"
+                elif "CUBRE" in str(val):
+                    return "background-color: #f0fdf4; color: #16a34a; font-weight: bold"
+                return ""
+            
+            cargo_df_styled = cargo_df.style.map(style_cover_status, subset=["cover_status"])
+            st.dataframe(cargo_df_styled, use_container_width=True, hide_index=True)
+            
+            non_covering_items = cargo_df[cargo_df["cover_status"].str.contains("NO CUBRE|ROTURA", regex=True)]
+            
+            if not non_covering_items.empty:
+                with st.expander("🚨 FLUJO DE CONTINGENCIA - Envío Aéreo de Emergencia", expanded=True):
+                    st.markdown("**Paso 1: Selección de Ruta Aérea**")
+                    
+                    air_routes_df = pd.DataFrame(bundle.get("air_routes", []))
+                    
+                    if not air_routes_df.empty:
+                        route_options = air_routes_df[["origin_airport", "dest_city", "air_cost_eur", "air_eta_hours"]].drop_duplicates()
+                        route_options = route_options.dropna(subset=["air_cost_eur"])
+                        
+                        route_display = [f"{row['origin_airport']} → {row['dest_city']} ({row['air_cost_eur']:,.0f}€ | {row['air_eta_hours']}h)" 
+                                        for _, row in route_options.iterrows()]
+                        selected_route_idx = st.selectbox("Ruta aérea disponible", range(len(route_display)), 
+                                                          format_func=lambda x: route_display[x], key="contingency_route")
+                        
+                        selected_route = route_options.iloc[selected_route_idx]
+                        
+                        st.markdown("---")
+                        st.markdown("**Paso 2: Referencias Críticas a Volar**")
+                        
+                        critical_items = non_covering_items[["article_id", "quantity", "customer_dest", "cover_status"]].copy()
+                        st.dataframe(critical_items, use_container_width=True, hide_index=True)
+                        
+                        total_air_cost = selected_route["air_cost_eur"] if not pd.isna(selected_route["air_cost_eur"]) else 0
+                        estimated_arrival = selected_route["air_eta_hours"] if not pd.isna(selected_route["air_eta_hours"]) else 0
+                        
+                        st.markdown("---")
+                        st.markdown("**Paso 3: Alternativas de Última Milla (Camión)**")
+                        
+                        truck_alternatives = pd.DataFrame([
+                            {"opcion": "Exprés 24h", "coste_eur": 850, "tiempo_h": 24, "recomendado": "⭐"},
+                            {"opcion": "Económico 48h", "coste_eur": 450, "tiempo_h": 48, "recomendado": ""},
+                            {"opcion": "Compartido 72h", "coste_eur": 280, "tiempo_h": 72, "recomendado": ""},
+                        ])
+                        
+                        def highlight_recommended(val):
+                            if val == "⭐":
+                                return "background-color: #dcfce7; color: #16a34a; font-weight: bold"
+                            return ""
+                        
+                        truck_styled = truck_alternatives.style.map(highlight_recommended, subset=["recomendado"])
+                        st.dataframe(truck_styled, use_container_width=True, hide_index=True)
+                        
+                        selected_truck = st.selectbox("Seleccionar opción de camión", 
+                                                      ["Exprés 24h", "Económico 48h", "Compartido 72h"],
+                                                      key="contingency_truck")
+                        
+                        truck_cost_map = {"Exprés 24h": 850, "Económico 48h": 450, "Compartido 72h": 280}
+                        truck_time_map = {"Exprés 24h": 24, "Económico 48h": 48, "Compartido 72h": 72}
+                        
+                        truck_cost = truck_cost_map.get(selected_truck, 0)
+                        truck_time = truck_time_map.get(selected_truck, 0)
+                        
+                        total_cost = total_air_cost + truck_cost
+                        total_eta = estimated_arrival + truck_time
+                        
+                        st.markdown("---")
+                        st.markdown("**Paso 4: Resumen de Contingencia**")
+                        
+                        summary_col1, summary_col2, summary_col3, summary_col4 = st.columns(4)
+                        
+                        with summary_col1:
+                            st.metric("Coste Aéreo", f"{total_air_cost:,.0f}€")
+                        with summary_col2:
+                            st.metric("Coste Camión", f"{truck_cost}€")
+                        with summary_col3:
+                            st.metric("Coste Total", f"{total_cost:,.0f}€", delta_color="inverse")
+                        with summary_col4:
+                            st.metric("ETA Total", f"{total_eta}h")
+                        
+                        if total_cost > 15000:
+                            st.warning("⚠️ Coste elevado de contingencia. Considerar opciones alternativas.")
+                        else:
+                            st.success("✅ Coste dentro de parámetros aceptables.")
+                    else:
+                        st.error("No hay rutas aéreas disponibles en el sistema.")
+            else:
+                st.success(f"✅ Todos los artículos en {selected_ship} están cubiertos.")
+
     st.markdown("---")
-    st.markdown("#### 📦 Stock por Referencia")
 
     week_filter = None if selected_week == "Todas" else selected_week
-    stock_df = build_stock_table(bundle, selected_customer, week_filter)
-    if stock_df.empty:
-        st.info("Todavia no hay datos de stock preparados para Valladolid.")
-    else:
-        st.dataframe(stock_df, use_container_width=True, hide_index=True)
 
-    st.subheader("Stock por referencia")
-    stock_fig = build_stock_bar_chart(bundle, selected_customer, week_filter)
-    if stock_fig is None:
-        st.info("Todavia no hay suficiente informacion para pintar el stock por referencia.")
-    else:
-        st.plotly_chart(stock_fig, use_container_width=True)
+    with st.container():
+        st.markdown("#### 📊 Estado Actual - Stock por Referencia")
+        stock_fig = build_stock_bar_chart(bundle, selected_customer, week_filter)
+        if stock_fig is None:
+            st.info("Todavia no hay suficiente informacion para pintar el stock por referencia.")
+        else:
+            st.plotly_chart(stock_fig, use_container_width=True)
+
+    st.divider()
+
+    with st.container():
+        st.markdown("#### 📈 Proyección Futura - Horizonte de 10 Semanas Industriales")
+        render_stock_horizon_table(bundle, selected_customer)
+
+    st.markdown("---")
 
     stock_left, stock_right = st.columns([1.05, 0.95])
     with stock_left:
@@ -1641,7 +1785,7 @@ elif current_page == "2. Control Tower Valladolid":
         if gantt_fig is None:
             st.info("Todavia no hay tareas de planificacion para mostrar en el Gantt.")
         else:
-            st.plotly_chart(gantt_fig, use_container_width=True)
+            st.plotly_chart(gantt_fig, use_container_width=True, key="gantt_industrial")
 
     lower_left, lower_right = st.columns([1.15, 0.85])
     with lower_left:
@@ -1650,7 +1794,7 @@ elif current_page == "2. Control Tower Valladolid":
         if stock_gantt is None:
             st.info("Todavia no hay suficiente informacion para calcular ruptura de stock por ETA maritima.")
         else:
-            st.plotly_chart(stock_gantt, use_container_width=True)
+            st.plotly_chart(stock_gantt, use_container_width=True, key="stock_coverage_gantt")
 
     with lower_right:
         st.subheader("Propuesta de contingencia aerea")
@@ -1659,9 +1803,6 @@ elif current_page == "2. Control Tower Valladolid":
             st.info("No hay referencias en rotura de stock con propuesta aerea disponible en este momento.")
         else:
             st.dataframe(contingency_df, use_container_width=True, hide_index=True)
-
-    st.subheader("Horizonte de 10 semanas industriales")
-    render_stock_horizon_table(bundle, selected_customer)
 
     st.markdown("---")
 
