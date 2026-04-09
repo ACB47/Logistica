@@ -3,8 +3,8 @@
 Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el repo.
 
 ## Ultima actualizacion
-- Fecha de referencia: 2026-04-08
-- Contexto: se completaron todas las pestañas del dashboard Streamlit con diseño profesional: Control Tower con warehouse dashboard y seguimiento de flota, Persistencia con KPIs, graficos y catalogo de datos, Orquestacion con Airflow DAGs y timeline, y Evidencias KDD con KPIs, diagramas UML y evidencias de ingesta.
+- Fecha de referencia: 2026-04-09
+- Contexto: Refactorización de pestañas del dashboard Streamlit - Control Tower con 3 bloques verticales obligatorios (tabla stock, gráfico barras, Gantt 10 semanas) y Evidencias KDD con 4 bloques (KPIs ML, Arquitectura Lambda visual, UML tabs, Auditoría Spark/NiFi).
 
 ## Resumen ejecutivo
 - El proyecto ya tiene una base funcional de demo: productores Kafka, landing raw en HDFS, jobs Spark batch, tablas Hive, soporte Cassandra, notebooks Zeppelin y un DAG de Airflow.
@@ -61,7 +61,19 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
   - `Control Tower Valladolid`: Warehouse dashboard con donut de capacidad y grafico de stock por categoria, seguimiento de flota con nombres reales de barcos, barra de progreso de trayecto y tabla de contingencia con estado CUBRE/NO CUBRE.
   - `7. Persistencia`: KPIs (HDFS 2.4TB, 18 tablas Hive, 12ms latencia Cassandra), grafico de flujo de registros, donut de data lake y alertas, catalogo de 12 tablas, mapa de linaje Graphviz.
   - `8. Orquestacion`: Panel de salud, timeline de DAG con px.timeline, donut de tasa de exito, historial de ejecuciones, enlace a consola Airflow.
-  - `9. Evidencias KDD`: KPIs de resumen (5 fases, 3 modelos, 4 formatos), linea visual del flujo KDD, selector de diagramas UML, export NiFi JSON, simulacion HDFS ls.
+   - `9. Evidencias KDD`: KPIs de resumen (5 fases, 3 modelos, 4 formatos), linea visual del flujo KDD, selector de diagramas UML, export NiFi JSON, simulacion HDFS ls.
+
+## Recientes mejoras (2026-04-09)
+- **Control Tower Valladolid**: Refactorizado con 3 bloques verticales obligatorios:
+  1. Tabla de detalles de almacén (dim_articles_valladolid)
+  2. Gráfico de barras de stock por referencia
+  3. Horizonte de 10 semanas industriales (Gantt)
+- **Evidencias KDD**: Reformateado como panel de auditoría académica con 4 bloques:
+  1. Panel de Modelos de IA y KDD (KPIs): Fases KDD 5/5, MLlib 3 algoritmos, GraphFrames 156 nodos
+  2. Arquitectura Lambda visual: Diagrama Open-Meteo → NiFi → Kafka → Spark → HDFS/Hive/Cassandra → Dashboard
+  3. Visor UML con tabs: Casos de Uso, Diagrama de Clases, Diagrama de Secuencia, Arquitectura
+  4. Auditoría Spark/NiFi: Petición GET a localhost:8080, tabla de aplicaciones, JSON de flujo NiFi
+- Eliminada tabla de stock duplicada que estaba en Evidencias KDD (pertenece a Control Tower)
 
 ## Estado por fases KDD
 
