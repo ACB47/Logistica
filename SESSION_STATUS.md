@@ -3,8 +3,8 @@
 Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el repo.
 
 ## Ultima actualizacion
-- Fecha de referencia: 2026-04-09
-- Contexto: Refactorización de pestañas del dashboard Streamlit - Control Tower con 3 bloques verticales obligatorios (tabla stock, gráfico barras, Gantt 10 semanas) y Evidencias KDD con 4 bloques (KPIs ML, Arquitectura Lambda visual, UML tabs, Auditoría Spark/NiFi).
+- Fecha de referencia: 2026-04-11
+- Contexto: estabilización del stack de servicios para demo local, migración operativa a `docker compose`, optimización de recursos Docker/Spark y rediseño ejecutivo de la portada del dashboard.
 
 ## Resumen ejecutivo
 - El proyecto ya tiene una base funcional de demo: productores Kafka, landing raw en HDFS, jobs Spark batch, tablas Hive, soporte Cassandra, notebooks Zeppelin y un DAG de Airflow.
@@ -47,6 +47,11 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - Punto exacto de reanudacion: al volver hay que refrescar el bundle del dashboard con `spark-submit jobs/spark/99_dashboard_bundle.py` y comprobar que el mapa operacional y la tabla de ETA cargan con los filtros de destino/barco.
 - Punto exacto de reanudacion: si el dashboard sale vacio, levantar `docker compose -f docker-compose.hdfs.yml up -d` y regenerar `dashboard_bundle_output.json` antes de abrir Streamlit.
 - El bundle del dashboard ya incorpora `eta_hours_estimate` por barco para conectar ETA con riesgo de stock y decisiones de contingencia.
+- Se corrigió el error de recreación `KeyError: 'ContainerConfig'` eliminando el uso operativo de `docker-compose` v1 y migrando scripts y dashboard a `docker compose` v2.
+- El stack completo ahora arranca con límites de memoria/CPU y `healthcheck` en Kafka, HDFS y Cassandra para reducir saturación del equipo y evitar dependencias prematuras.
+- Se añadió `jobs/spark/spark_config.py` como configuración compartida de Spark local con menos memoria y menos particiones shuffle.
+- La portada `Resumen Ejecutivo` del dashboard fue rediseñada con KPIs gerenciales, donuts operativos, área de proyección y panel ROI de contingencias con fallback visual para demo.
+- El panel de servicios del dashboard ya detecta correctamente los nombres actuales de contenedores de Docker Compose v2 (`logistica-*-1`).
 - Lo mas importante pendiente ahora es cerrar evidencias, Airflow visual, narrativa final de defensa y documentacion completa sobre la ruta Docker/local.
 - Se añadieron nuevas pestañas al dashboard Streamlit:
   - `10. Alertas y Contingencias`: Panel de alertas críticas (fact_alerts), tabla interactiva de decisión (fact_air_recovery_options), scatter plot de IA (coste vs tiempo), mapa de contingencia multimodal con rutas marítimas y desviaciones aéreas.
@@ -74,6 +79,19 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
   3. Visor UML con tabs: Casos de Uso, Diagrama de Clases, Diagrama de Secuencia, Arquitectura
   4. Auditoría Spark/NiFi: Petición GET a localhost:8080, tabla de aplicaciones, JSON de flujo NiFi
 - Eliminada tabla de stock duplicada que estaba en Evidencias KDD (pertenece a Control Tower)
+
+## Recientes mejoras (2026-04-11)
+- **Servicios Docker**:
+  1. Migración de scripts operativos y dashboard a `docker compose`
+  2. Eliminación del warning por `version` obsoleta en `docker-compose.yml`
+  3. Límites de recursos para servicios pesados y arranque ordenado con `healthcheck`
+- **Spark local**:
+  1. Nueva configuración compartida en `jobs/spark/spark_config.py`
+  2. Ajuste de memoria y `spark.sql.shuffle.partitions` para entorno local
+- **Dashboard Streamlit**:
+  1. Rediseño de `Resumen Ejecutivo`
+  2. Fix del panel de estado de servicios con nombres Compose v2
+  3. Fallbacks de datos para demos sin conexión completa
 
 ## Estado por fases KDD
 

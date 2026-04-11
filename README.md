@@ -9,7 +9,7 @@ Este repositorio contiene la **guía paso a paso** y los **artefactos** para el 
 El proyecto está **completamente dockerizado** para ejecutarse en cualquier ordenador.
 
 ### Requisitos
-- Docker y Docker Compose instalados
+- Docker con `docker compose` disponible
 
 ### Inicio rápido
 ```bash
@@ -70,7 +70,16 @@ El proyecto está **completamente dockerizado** para ejecutarse en cualquier ord
 - Rebuild rapido de tablas Hive demo tras reinicio:
   - `bash scripts/66_rebuild_hive_demo_tables.sh`
 - Si Spark/Hive pierde tablas tras reinicio, recrear el contenedor `spark` para reabrir el metastore persistente:
-  - `docker-compose rm -sf spark && docker-compose up -d spark`
+  - `docker compose rm -sf spark && docker compose up -d spark`
+
+## Optimización local de recursos
+
+- `docker-compose.yml` ya limita memoria y CPU en los servicios más pesados para evitar saturar el host:
+  - `spark`: `2g`, `1.5` CPU
+  - `kafka`, `namenode`, `datanode`, `cassandra`, `nifi`, `airflow-webserver`: perfiles reducidos para demo local
+- El arranque ahora usa `healthcheck` y `depends_on.condition` en Kafka, HDFS y Cassandra para evitar bucles de arranque.
+- Los jobs Spark comparten configuración optimizada en `jobs/spark/spark_config.py`.
+- El dashboard usa `docker compose` v2 y detecta correctamente los nombres de contenedor actuales (`logistica-spark-1`, `logistica-kafka-1`, etc.).
 
 ## Dashboard de defensa
 
@@ -79,6 +88,7 @@ El proyecto está **completamente dockerizado** para ejecutarse en cualquier ord
 - Ejecucion:
   - `bash scripts/67_run_dashboard.sh`
 - Si el dashboard aparece vacio, levantar primero el stack HDFS y regenerar el bundle.
+- Si el panel de servicios no refleja cambios recientes, refrescar la página o esperar el TTL de caché de 15 segundos.
 - Incluye:
   - estado de servicios `OK/NOK/OFF`
   - botones de arranque/parada por servicio

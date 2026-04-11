@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+COMPOSE_CMD=(docker compose)
 
 ACTION="${1:-status}"
 STACK_MODE="${2:-simple}"
@@ -72,7 +73,7 @@ while IFS= read -r service; do
 done < <(profile_services)
 
 run_compose() {
-  docker-compose -f "${COMPOSE_FILE}" "$@"
+  "${COMPOSE_CMD[@]}" -f "${COMPOSE_FILE}" "$@"
 }
 
 start_stack() {

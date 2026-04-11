@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+COMPOSE_CMD=(docker compose)
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
@@ -40,7 +42,7 @@ case $opcion in
     2)
         echo ""
         echo "Iniciando modo SIMPLE..."
-        docker-compose -f docker-compose.simple.yml up -d
+        "${COMPOSE_CMD[@]}" -f docker-compose.simple.yml up -d
         echo ""
         echo "=========================================="
         echo "SERVICIOS LEVANTADOS (SIMPLE)"
@@ -62,7 +64,7 @@ case $opcion in
     *)
         echo ""
         echo "Iniciando modo COMPLETO..."
-        docker-compose up -d
+        "${COMPOSE_CMD[@]}" up -d
         echo ""
         echo "=========================================="
         echo "SERVICIOS LEVANTADOS (COMPLETO)"
@@ -87,6 +89,6 @@ esac
 
 echo "=========================================="
 echo "Comandos utiles:"
-echo "  docker-compose -f ${COMPOSE_FILE} logs -f [servicio]"
-echo "  docker-compose -f ${COMPOSE_FILE} down"
+echo "  docker compose -f ${COMPOSE_FILE} logs -f [servicio]"
+echo "  docker compose -f ${COMPOSE_FILE} down"
 echo "=========================================="

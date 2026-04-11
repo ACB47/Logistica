@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   kafka:
     image: apache/kafka:3.9.1
@@ -19,18 +17,27 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_HEAP_OPTS: "-Xmx512M -Xms256M"
     volumes:
       - kafka_data:/var/lib/kafka/data
     networks:
       - logistica-net
+    mem_limit: 1g
+    cpus: 1
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   kafka-init:
     image: apache/kafka:3.9.1
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     command: >
       bash -ec "
-        sleep 15 &&
+        sleep 10 &&
         for topic in datos_crudos alertas_globales datos_filtrados datos_filtrados_ok; do
           /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1 --topic \"$$topic\";
         done &&
@@ -50,21 +57,38 @@ services:
       CLUSTER_NAME: logistica-cluster
       CORE_CONF_fs_defaultFS: hdfs://namenode:8020
       HDFS_CONF_dfs_replication: 1
+      HEAP_OPTS: "-Xmx512m -Xms256m"
     networks:
       - logistica-net
+    mem_limit: 1g
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9870/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
 
   datanode:
     image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
     depends_on:
-      - namenode
+      namenode:
+        condition: service_healthy
     volumes:
       - hdfs_datanode:/hadoop/dfs/data
     environment:
       CORE_CONF_fs_defaultFS: hdfs://namenode:8020
       HDFS_CONF_dfs_replication: 1
       SERVICE_PRECONDITION: "namenode:9870"
+      HEAP_OPTS: "-Xmx512m -Xms256m"
     networks:
       - logistica-net
+    mem_limit: 1g
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9864/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
 
   cassandra:
     image: cassandra:5.0
@@ -72,18 +96,25 @@ services:
       - "9042:9042"
     volumes:
       - cassandra_data:/var/lib/cassandra
+    environment:
+      HEAP_NEWSIZE: 256m
+      MAX_HEAP_SIZE: 512m
     networks:
       - logistica-net
+    mem_limit: 1g
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'describe keyspaces' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
 
   cassandra-init:
     image: python:3.10
     depends_on:
-      - cassandra
-    command: >
-      bash -c "
-        sleep 20 &&
-        pip install cassandra-driver &&
-        python -c 'from cassandra.cluster import Cluster; c=Cluster([\"cassandra\"]); s=c.connect(); s.execute(\"CREATE KEYSPACE IF NOT EXISTS logistica WITH replication = {\\\"class\\\": \\\"SimpleStrategy\\\", \\\"replication_factor\\\": 1}\"); s.set_keyspace(\"logistica\"); s.execute(\"CREATE TABLE IF NOT EXISTS ship_metrics (window_start timestamp, window_end timestamp, dest_port text, route_id text, avg_speed double, speed_std double, ship_count int, avg_lat double, avg_lon double, processed_at timestamp, PRIMARY KEY (dest_port, window_start))\"); s.execute(\"CREATE TABLE IF NOT EXISTS alert_metrics (window_start timestamp, window_end timestamp, region text, source text, avg_severity double, avg_confidence double, alert_count int, processed_at timestamp, PRIMARY KEY (region, window_start))\"); s.execute(\"CREATE TABLE IF NOT EXISTS ml_predictions (prediction_id timeuuid, ship_id text, dest_port text, predicted_delay_hours double, risk_category text, model_used text, confidence double, created_at timestamp, PRIMARY KEY (ship_id, created_at))\"); s.execute(\"CREATE TABLE IF NOT EXISTS route_alerts (alert_id timeuuid, dest_port text, risk_level text, risk_score double, severity int, recommendation text, email_sent boolean, created_at timestamp, PRIMARY KEY (dest_port, created_at))\"); print(\"Cassandra OK\")'
+      cassandra:
+        condition: service_healthy
+    command: "bash -c 'sleep 20 && pip install cassandra-driver && python -c \"from cassandra.cluster import Cluster; c=Cluster([\\\"cassandra\\\"]); s=c.connect(); s.execute(\\\"CREATE KEYSPACE IF NOT EXISTS logistica WITH replication = {\\\\\\\"class\\\\\\\": \\\\\\\"SimpleStrategy\\\\\\\", \\\\\\\"replication_factor\\\\\\\": 1}\\\"); s.set_keyspace(\\\"logistica\\\"); s.execute(\\\"CREATE TABLE IF NOT EXISTS ship_metrics (window_start timestamp, window_end timestamp, dest_port text, route_id text, avg_speed double, speed_std double, ship_count int, avg_lat double, avg_lon double, processed_at timestamp, PRIMARY KEY (dest_port, window_start))\\\"); s.execute(\\\"CREATE TABLE IF NOT EXISTS alert_metrics (window_start timestamp, window_end timestamp, region text, source text, avg_severity double, avg_confidence double, alert_count int, processed_at timestamp, PRIMARY KEY (region, window_start))\\\"); s.execute(\\\"CREATE TABLE IF NOT EXISTS ml_predictions (prediction_id timeuuid, ship_id text, dest_port text, predicted_delay_hours double, risk_category text, model_used text, confidence double, created_at timestamp, PRIMARY KEY (ship_id, created_at))\\\"); s.execute(\\\"CREATE TABLE IF NOT EXISTS route_alerts (alert_id timeuuid, dest_port text, risk_level text, risk_score double, severity int, recommendation text, email_sent boolean, created_at timestamp, PRIMARY KEY (dest_port, created_at))\\\"); print(\\\"Cassandra OK\\\")\"'"
     networks:
       - logistica-net
 
@@ -91,6 +122,8 @@ services:
     image: jupyter/pyspark-notebook:latest
     environment:
       JAVA_TOOL_OPTIONS: -Dderby.system.home=/home/jovyan/.derby
+      PYSPARK_DRIVER_MEMORY: 1g
+      PYSPARK_EXECUTOR_MEMORY: 1g
     ports:
       - "8888:8888"
       - "4040:4040"
@@ -102,6 +135,13 @@ services:
       - spark_warehouse_state:/home/jovyan/.spark-local-state
     networks:
       - logistica-net
+    mem_limit: 2g
+    cpus: 1.5
+    depends_on:
+      kafka:
+        condition: service_healthy
+      namenode:
+        condition: service_healthy
 
   zeppelin:
     image: apache/zeppelin:0.10.1
@@ -112,16 +152,21 @@ services:
       - ./jobs:/jobs
     networks:
       - logistica-net
+    mem_limit: 1g
+    cpus: 0.5
 
   nifi:
     image: apache/nifi:2.6.0
     environment:
       SINGLE_USER_CREDENTIALS_USERNAME: ${NIFI_USERNAME:-admin}
       SINGLE_USER_CREDENTIALS_PASSWORD: ${NIFI_PASSWORD:-Admin123456!}
+      NIFI_HEAP_SIZE: 512m
     ports:
       - "8443:8443"
     networks:
       - logistica-net
+    mem_limit: 1g
+    cpus: 0.5
 
   postgres:
     image: postgres:13
@@ -133,13 +178,17 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - logistica-net
+    mem_limit: 256m
+    cpus: 0.25
 
   airflow-webserver:
     image: apache/airflow:2.10.5-python3.10
     user: "${AIRFLOW_UID:-1000}:0"
     depends_on:
-      - kafka
-      - postgres
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_started
     command: standalone
     ports:
       - "8085:8080"
@@ -147,6 +196,9 @@ services:
       AIRFLOW__CORE__EXECUTOR: SequentialExecutor
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+      AIRFLOW__CORE__PARALLELISM: 2
+      AIRFLOW__CORE__DAG_CONCURRENCY: 2
+      AIRFLOW__SCHEDULER__MAX_THS_PER_RUN: 1
       _AIRFLOW_WWW_USER_USERNAME: admin
       _AIRFLOW_WWW_USER_PASSWORD: admin
       AIRFLOW__SMTP__SMTP_HOST: ${SMTP_HOST:-smtp-mail.outlook.com}
@@ -159,6 +211,8 @@ services:
       - ./ingesta:/ingesta
     networks:
       - logistica-net
+    mem_limit: 1g
+    cpus: 0.5
 
 volumes:
   hdfs_namenode:

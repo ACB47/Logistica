@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import sys
+sys.path.insert(0, "/home/jovyan/jobs/spark")
+
 from pyspark.sql import SparkSession
+from spark_config import get_optimized_spark
 
 
 PORTS = [
@@ -103,14 +107,7 @@ AIR_RECOVERY_CORRIDORS = [
 
 
 def main() -> None:
-    spark = (
-        SparkSession.builder.appName("logistica-01-load-master-dimensions")
-        .config("spark.hadoop.fs.defaultFS", "hdfs://namenode:8020")
-        .config("spark.sql.warehouse.dir", "hdfs://namenode:8020/user/hive/warehouse")
-        .config("spark.sql.shuffle.partitions", "4")
-        .enableHiveSupport()
-        .getOrCreate()
-    )
+    spark = get_optimized_spark("logistica-01-load-master-dimensions")
 
     spark.sql("CREATE DATABASE IF NOT EXISTS logistica")
 

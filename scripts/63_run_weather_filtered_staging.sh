@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+COMPOSE_CMD=(docker compose)
+
 MODE="${1:-full}"
 BOOTSTRAP="${BOOTSTRAP:-kafka:9092}"
 TOPIC="${TOPIC:-datos_filtrados}"
@@ -8,9 +10,9 @@ TOPIC="${TOPIC:-datos_filtrados}"
 case "${MODE}" in
   full)
     echo "Preparando servicios necesarios del compose completo..."
-    docker-compose up -d kafka namenode datanode spark
+    "${COMPOSE_CMD[@]}" up -d kafka namenode datanode spark
     echo "Lanzando spark-submit en el contenedor spark..."
-    docker-compose exec -T spark spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 /home/jovyan/jobs/spark/01_weather_filtered_to_staging.py \
+    "${COMPOSE_CMD[@]}" exec -T spark spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 /home/jovyan/jobs/spark/01_weather_filtered_to_staging.py \
       --bootstrap "${BOOTSTRAP}" \
       --topic "${TOPIC}"
     ;;

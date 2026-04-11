@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+COMPOSE_CMD=(docker compose)
+
 echo "=========================================="
 echo "PROYECTO LOGISTICA - PARADA"
 echo "=========================================="
@@ -21,13 +23,13 @@ esac
 
 echo ""
 echo "Deteniendo servicios..."
-docker-compose -f "$COMPOSE_FILE" down
+"${COMPOSE_CMD[@]}" -f "$COMPOSE_FILE" down
 
 echo ""
 read -p "Desea eliminar los volumenes de datos? (s/n): " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Ss]$ ]]; then
-    docker-compose -f "$COMPOSE_FILE" down -v
+    "${COMPOSE_CMD[@]}" -f "$COMPOSE_FILE" down -v
     echo "Volumenes eliminados."
 fi
 

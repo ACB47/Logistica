@@ -24,8 +24,8 @@ Guidance for coding agents working in this repository.
 - Full stack: `./start.sh` then choose `1`.
 - Simple stack: `./start.sh` then choose `2`.
 - Stop stack: `./stop.sh`.
-- Direct full Compose start: `docker-compose up -d`.
-- Direct simple Compose start: `docker-compose -f docker-compose.simple.yml up -d`.
+- Direct full Compose start: `docker compose up -d`.
+- Direct simple Compose start: `docker compose -f docker-compose.simple.yml up -d`.
 - Build base image: `docker build -t logistica .`.
 
 ### Python environments
@@ -78,8 +78,8 @@ Guidance for coding agents working in this repository.
 - Airflow DAG syntax: `python3 -m py_compile airflow/dags/logistica_kdd_dag.py`
 
 ### Compose validation
-- Full config: `docker-compose config`
-- Simple config: `docker-compose -f docker-compose.simple.yml config`
+- Full config: `docker compose config`
+- Simple config: `docker compose -f docker-compose.simple.yml config`
 
 ### Spark validation
 - Run the smallest affected Spark job directly with `spark-submit`.
