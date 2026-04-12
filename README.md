@@ -98,6 +98,24 @@ El proyecto está **completamente dockerizado** para ejecutarse en cualquier ord
   - tablas de `fact_alerts`, `fact_weather_operational` y `fact_graph_centrality`
   - portada ejecutiva con regla explícita de contingencia aérea (`>= 24h` ahorro y `<= 18.000 EUR` inversión media)
 
+## DASHBOARD
+
+Código fuente Python del dashboard:
+
+- `dashboard/app.py`: aplicación principal Streamlit, navegación, vistas y lógica visual.
+- `dashboard/cache_utils.py`: utilidades de caché y conexiones para consultas a Hive/Cassandra.
+- `jobs/spark/99_dashboard_bundle.py`: generación del bundle JSON consumido por el dashboard.
+- `scripts/67_run_dashboard.sh`: arranque local del dashboard Streamlit.
+
+Diseño y experiencia visual del dashboard:
+
+- Estilo visual corporativo con `Streamlit` y `Plotly`, orientado a defensa ejecutiva y auditoría técnica.
+- Menú lateral jerárquico con navegación por botones, identidad de marca y accesos técnicos del stack.
+- Portada `Resumen Ejecutivo` con KPIs, donuts operativos, proyección visual y regla económica explícita de contingencia aérea.
+- Vista `Control Tower Valladolid` con enfoque operacional: stock, cobertura, Gantt industrial y flujo de contingencia multimodal.
+- Vista `Arquitectura en vivo` con enfoque técnico minimalista: estado del pipeline, controles del stack y lista viva de servicios KDD.
+- Pestañas de auditoría KDD, persistencia, orquestación y evidencias diseñadas para mostrar trazabilidad técnica durante la defensa.
+
 ## Stack tecnológico (rúbrica cumplida)
 
 | Componente | Implementación |

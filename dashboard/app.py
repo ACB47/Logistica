@@ -1327,49 +1327,50 @@ selected_week = "Todas"
 selected_customer = "Todos"
 current_page = st.session_state.get("vista_actual", "1. Resumen Ejecutivo")
 
-hero_left, hero_right = st.columns([1.7, 0.9])
-with hero_left:
-    st.markdown("<div class='hero-eyebrow'>BIG DATA TRANSPORT MONITOR</div>", unsafe_allow_html=True)
-    st.markdown("<div class='hero-title'>2026: Predictive<br/>Logistics</div>", unsafe_allow_html=True)
-    st.markdown(
-        "<div class='hero-subtitle'>Centro de control del pipeline KDD: posicion de flota, riesgo meteorologico, alertas operativas, contingencia aerea, estado de servicios y analitica de red.</div>",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        """
-        <div>
-          <span class='tag-chip'>NiFi</span>
-          <span class='tag-chip'>Kafka</span>
-          <span class='tag-chip'>Spark + Hive</span>
-          <span class='tag-chip'>Cassandra</span>
-          <span class='tag-chip'>GraphFrames</span>
-          <span class='tag-chip'>Air Recovery</span>
-          <span class='tag-chip'>Airflow</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-with hero_right:
-    render_panel(
-        "Estado del pipeline",
-        "sincronizado",
-        f"Snapshots servidos desde Spark/Hive, HDFS y Cassandra.<br/><br/><strong>Servicios OK:</strong> {ok_count}/{len(service_rows)}<br/><strong>Riesgo medio:</strong> {'MEDIUM' if medium_alerts else 'LOW'}<br/><strong>Storage:</strong> HDFS + Hive",
-        height=250,
-    )
+if current_page != "3. Arquitectura en vivo":
+    hero_left, hero_right = st.columns([1.7, 0.9])
+    with hero_left:
+        st.markdown("<div class='hero-eyebrow'>BIG DATA TRANSPORT MONITOR</div>", unsafe_allow_html=True)
+        st.markdown("<div class='hero-title'>2026: Predictive<br/>Logistics</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='hero-subtitle'>Centro de control del pipeline KDD: posicion de flota, riesgo meteorologico, alertas operativas, contingencia aerea, estado de servicios y analitica de red.</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            """
+            <div>
+              <span class='tag-chip'>NiFi</span>
+              <span class='tag-chip'>Kafka</span>
+              <span class='tag-chip'>Spark + Hive</span>
+              <span class='tag-chip'>Cassandra</span>
+              <span class='tag-chip'>GraphFrames</span>
+              <span class='tag-chip'>Air Recovery</span>
+              <span class='tag-chip'>Airflow</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with hero_right:
+        render_panel(
+            "Estado del pipeline",
+            "sincronizado",
+            f"Snapshots servidos desde Spark/Hive, HDFS y Cassandra.<br/><br/><strong>Servicios OK:</strong> {ok_count}/{len(service_rows)}<br/><strong>Riesgo medio:</strong> {'MEDIUM' if medium_alerts else 'LOW'}<br/><strong>Storage:</strong> HDFS + Hive",
+            height=250,
+        )
 
-metric_cols = st.columns(6)
-with metric_cols[0]:
-    render_card("Flota monitorizada", str(len(bundle.get("ships_latest", []))), "Ultimo estado por vehiculo")
-with metric_cols[1]:
-    render_card("DOH Valladolid", f"{kpis['doh']}", "Cobertura media de stock")
-with metric_cols[2]:
-    render_card("OTIF estimado", f"{kpis['otif']}%", "Pedidos Douai comprometidos")
-with metric_cols[3]:
-    render_card("ETA medio barcos", f"{kpis['eta_avg']}h", "Llegada estimada a España")
-with metric_cols[4]:
-    render_card("Stock seguridad", f"{kpis['security_level']}%", "Nivel medio de colchón")
-with metric_cols[5]:
-    render_card("Referencias críticas", str(kpis['critical_refs']), "Riesgo de rotura de stock")
+    metric_cols = st.columns(6)
+    with metric_cols[0]:
+        render_card("Flota monitorizada", str(len(bundle.get("ships_latest", []))), "Ultimo estado por vehiculo")
+    with metric_cols[1]:
+        render_card("DOH Valladolid", f"{kpis['doh']}", "Cobertura media de stock")
+    with metric_cols[2]:
+        render_card("OTIF estimado", f"{kpis['otif']}%", "Pedidos Douai comprometidos")
+    with metric_cols[3]:
+        render_card("ETA medio barcos", f"{kpis['eta_avg']}h", "Llegada estimada a España")
+    with metric_cols[4]:
+        render_card("Stock seguridad", f"{kpis['security_level']}%", "Nivel medio de colchón")
+    with metric_cols[5]:
+        render_card("Referencias críticas", str(kpis['critical_refs']), "Riesgo de rotura de stock")
 
 AIR_CONTINGENCY_MIN_TIME_SAVED_HOURS = 24
 AIR_CONTINGENCY_MAX_COST_EUR = 18000
@@ -2118,17 +2119,63 @@ elif current_page == "2. Control Tower Valladolid":
             st.plotly_chart(fig_gantt, use_container_width=True)
 
 elif current_page == "3. Arquitectura en vivo":
-    st.subheader("Arquitectura en vivo")
-    for row in service_rows:
-        cols = st.columns([2, 3, 2, 1, 1])
-        cols[0].write(f"**{row['service']}**")
-        cols[1].write(row["status"])
-        cols[2].markdown(f"<span class='status-pill {build_service_badge(row['badge'])}'>{row['badge']}</span>", unsafe_allow_html=True)
-        service_name = row["service"] if row["service"] != "airflow" else "airflow-webserver"
-        if cols[3].button("On", key=f"start_{row['service']}"):
+    st.markdown("# <div style='text-align:center;'>2026: Predictive Logistics</div>", unsafe_allow_html=True)
+    st.info("ℹ️ **Centro de control del pipeline KDD:** posición de flota, riesgo meteorológico, alertas operativas, contingencia aérea, estado de servicios y analítica de red.")
+    st.markdown("`NiFi` ➔ `Kafka` ➔ `Spark + Hive` ➔ `Cassandra` ➔ `GraphFrames` ➔ `Air Recovery` ➔ `Airflow`")
+    st.divider()
+
+    with st.container(border=True):
+        st.markdown("#### Estado del pipeline")
+        st.caption("Snapshots servidos desde Spark/Hive, HDFS y Cassandra.")
+        pipeline_cols = st.columns(3)
+        pipeline_cols[0].metric("Servicios OK", f"{ok_count}/{len(service_rows)}")
+        pipeline_cols[1].metric("Riesgo medio", "MEDIUM" if medium_alerts else "LOW")
+        pipeline_cols[2].metric("Storage", "HDFS + Hive")
+    st.divider()
+
+    stack_action_cols = st.columns(3)
+    if stack_action_cols[0].button("▶️ Arrancar todos los servicios", use_container_width=True, type="primary"):
+        st.code(run_command(DOCKER_COMPOSE + ["up", "-d", "postgres", "kafka", "nifi", "spark", "cassandra", "namenode", "datanode", "airflow-webserver"], timeout=600).stdout)
+        st.cache_data.clear()
+    if stack_action_cols[1].button("⏯️ Arrancar Servicios Lite", use_container_width=True):
+        st.code(run_command(DOCKER_COMPOSE + ["up", "-d", "kafka", "namenode", "datanode", "spark"], timeout=600).stdout)
+        st.cache_data.clear()
+    if stack_action_cols[2].button("⏹️ Parar todo el stack", use_container_width=True):
+        st.code(run_command(DOCKER_COMPOSE + ["down"], timeout=600).stdout)
+        st.cache_data.clear()
+
+    st.markdown("### ARQUITECTURA EN VIVO")
+    st.markdown("")
+
+    service_order = [
+        ("nifi", "NiFi (Ingesta)"),
+        ("kafka", "Kafka (Mensajería)"),
+        ("namenode", "HDFS / NameNode (Almacenamiento raw)"),
+        ("spark", "Spark (Procesamiento)"),
+        ("hive", "Hive (Analítica)"),
+        ("cassandra", "Cassandra (Serving)"),
+        ("airflow", "Airflow (Orquestación)"),
+        ("postgres", "Postgres (Backend)"),
+    ]
+    status_lookup = {row["service"]: row for row in service_rows}
+    if "spark" in status_lookup:
+        status_lookup["hive"] = status_lookup["spark"]
+    for service_key, service_label in service_order:
+        row = status_lookup.get(service_key, {"badge": "OFF", "status": "Not created", "service": service_key})
+        icon = {"OK": "🟢", "NOK": "🔴", "BOOT": "🟠", "OFF": "⚫"}.get(row["badge"], "⚫")
+        last_run = datetime.now().strftime("%Y-%m-%d %H:%M") if row["badge"] in {"OK", "BOOT"} else "Sin ejecución"
+        row_cols = st.columns([1.7, 1.5, 1.1, 1.2])
+        row_cols[0].markdown(f"**{service_label}**")
+        row_cols[1].caption(last_run)
+        row_cols[2].markdown(f"{icon} **{row['badge']}**")
+        action_cols = row_cols[3].columns(2)
+        service_name = service_key if service_key != "airflow" else "airflow-webserver"
+        if service_key == "hive":
+            service_name = "spark"
+        if action_cols[0].button("ON", key=f"arch_on_{service_key}", use_container_width=True):
             st.code(compose_service_action(service_name, "start"))
             st.rerun()
-        if cols[4].button("Off", key=f"stop_{row['service']}"):
+        if action_cols[1].button("OFF", key=f"arch_off_{service_key}", use_container_width=True):
             st.code(compose_service_action(service_name, "stop"))
             st.rerun()
 
