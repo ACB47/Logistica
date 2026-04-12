@@ -1703,6 +1703,40 @@ elif current_page == "1. Resumen Ejecutivo":
             )
             st.plotly_chart(area_fig, use_container_width=True, key="executive_projection_area")
 
+            with st.container(border=True):
+                st.markdown("### 🎯 Rendimiento de Entregas (OTIF)")
+                st.caption("Porcentaje de carga entregada a tiempo al clúster industrial (Douai & Cléon). Target SLA: 95%")
+                otif_cols = st.columns([0.8, 1.2])
+                with otif_cols[0]:
+                    st.metric("OTIF Global", "91.5%", delta="-3.5% vs Target", delta_color="inverse")
+                with otif_cols[1]:
+                    otif_df = pd.DataFrame(
+                        [
+                            {"Cliente": "Douai", "OTIF": 89, "Estado": "⚠️ Riesgo"},
+                            {"Cliente": "Cléon", "OTIF": 96, "Estado": "✅ Óptimo"},
+                        ]
+                    )
+                    otif_fig = px.bar(
+                        otif_df,
+                        x="OTIF",
+                        y="Cliente",
+                        orientation="h",
+                        text="Estado",
+                        color="Cliente",
+                        color_discrete_map={"Douai": "#f59e0b", "Cléon": "#16a34a"},
+                        title="OTIF por fábrica destino",
+                    )
+                    otif_fig.update_traces(textposition="outside")
+                    otif_fig.update_layout(
+                        margin=dict(l=10, r=20, t=50, b=10),
+                        legend_title_text="",
+                        showlegend=False,
+                        xaxis_title="OTIF (%)",
+                        yaxis_title="",
+                    )
+                    otif_fig.update_xaxes(range=[0, 100])
+                    st.plotly_chart(otif_fig, use_container_width=True, key="executive_otif_panel")
+
     st.divider()
 
     with st.container():
