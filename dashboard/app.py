@@ -1233,41 +1233,7 @@ st.set_page_config(page_title="Dashboard KDD Logistica", layout="wide")
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 with st.sidebar:
-    st.markdown("### Control Tower")
-    st.caption("Supervision KDD y operacion logistica")
-
-    st.markdown("#### 1. Estado del stack")
     service_rows = get_service_status()
-    for row in service_rows:
-        icon = {"OK": "🟢", "NOK": "🔴", "BOOT": "🟠", "OFF": "⚫"}.get(row["badge"], "⚪")
-        st.markdown(f"- {icon} **{row['service']}**: {row['badge']}")
-
-    st.markdown("#### 2. Accesos rapidos")
-    st.markdown(
-        """
-        - NiFi: `https://localhost:8443`
-        - Airflow: `http://localhost:8085`
-        - NameNode: `http://localhost:9870`
-        - Spark UI: `http://localhost:4040`
-        - Cassandra: `localhost:9042`
-        """
-    )
-
-    st.markdown("#### 3. Acciones globales")
-    if st.button("Refrescar dashboard"):
-        reset_dashboard_cache()
-    if st.button("Levantar stack completo"):
-        st.code(run_command(DOCKER_COMPOSE + ["up", "-d", "postgres", "kafka", "nifi", "spark", "cassandra", "namenode", "datanode", "airflow-webserver"], timeout=600).stdout)
-        st.cache_data.clear()
-    if st.button("Parar stack completo"):
-        st.code(run_command(DOCKER_COMPOSE + ["down"], timeout=600).stdout)
-        st.cache_data.clear()
-    if st.button("Rebuild tablas Hive demo"):
-        st.code(run_script("scripts/66_rebuild_hive_demo_tables.sh")[-3000:])
-    if st.button("Cargar Cassandra latest state"):
-        st.code(run_script("scripts/65_load_vehicle_latest_state_cassandra.sh")[-3000:])
-
-    st.markdown("#### 4. Navegacion recomendada")
     page_options = [
         "1. Resumen Ejecutivo",
         "2. Control Tower Valladolid",
@@ -1281,38 +1247,75 @@ with st.sidebar:
         "10. Alertas y Contingencias",
         "11. Ejecución Contingencia Multimodal",
     ]
-    if "dashboard_page" not in st.session_state:
-        st.session_state["dashboard_page"] = page_options[0]
+    if "vista_actual" not in st.session_state:
+        st.session_state["vista_actual"] = page_options[0]
 
-    for page_name in page_options:
-        if st.button(page_name, use_container_width=True, key=f"nav_{page_name}"):
-            st.session_state["dashboard_page"] = page_name
+    with st.container():
+        st.markdown("## 🌐 CONTROL TOWER ANACO 🌐")
+        st.caption("👤 Sede Central - Valladolid")
+        st.divider()
 
-    current_page = st.radio(
-        "Seccion actual",
-        page_options,
-        index=page_options.index(st.session_state["dashboard_page"]),
-        key="dashboard_page_radio",
-    )
-    st.session_state["dashboard_page"] = current_page
+    with st.container():
+        st.markdown("### 🧭 Navegación Principal")
+        st.markdown("#### 🏢 Bloque Negocio")
+        if st.button("Resumen Ejecutivo", use_container_width=True):
+            st.session_state["vista_actual"] = "1. Resumen Ejecutivo"
+        if st.button("Control Tower Valladolid", use_container_width=True):
+            st.session_state["vista_actual"] = "2. Control Tower Valladolid"
+        if st.button("Alertas y Contingencias", use_container_width=True):
+            st.session_state["vista_actual"] = "10. Alertas y Contingencias"
+        if st.button("Ejecución Contingencia Multimodal", use_container_width=True):
+            st.session_state["vista_actual"] = "11. Ejecución Contingencia Multimodal"
 
-    st.markdown("#### 5. Parametros de demo")
-    st.slider("Factor de demanda", 80, 140, 100)
-    st.slider("Retraso adicional ETA (h)", 0, 120, 48)
-    st.toggle("Activar contingencia aerea", value=True)
-    selected_week = st.selectbox("Semana industrial", ["Todas", "IW14", "IW15", "IW16", "IW17"], index=0)
-    selected_customer = st.selectbox("Cliente destino", ["Todos", "Douai", "Cleon"], index=0)
+        st.markdown("#### ⚙️ Bloque Auditoría KDD")
+        if st.button("Arquitectura en vivo", use_container_width=True):
+            st.session_state["vista_actual"] = "3. Arquitectura en vivo"
+        if st.button("Fase I - Ingesta", use_container_width=True):
+            st.session_state["vista_actual"] = "4. KDD Fase I - Ingesta"
+        if st.button("Fase II - Spark", use_container_width=True):
+            st.session_state["vista_actual"] = "5. KDD Fase II - Spark"
+        if st.button("GraphFrames", use_container_width=True):
+            st.session_state["vista_actual"] = "6. GraphFrames"
+        if st.button("Persistencia", use_container_width=True):
+            st.session_state["vista_actual"] = "7. Persistencia"
+        if st.button("Orquestación", use_container_width=True):
+            st.session_state["vista_actual"] = "8. Orquestacion"
+        if st.button("Evidencias KDD", use_container_width=True):
+            st.session_state["vista_actual"] = "9. Evidencias KDD"
 
-    st.markdown("#### 6. Ayuda rapida")
-    st.markdown(
-        """
-        - Verde: cobertura suficiente
-        - Naranja: cobertura tensionada
-        - Rojo: riesgo de rotura
-        - Primero revisa stock Valladolid y ETA
-        - Luego consulta contingencia aerea
-        """
-    )
+    st.divider()
+
+    with st.container():
+        st.markdown("### 🚀 Acciones Globales")
+        if st.button("🔄 Refrescar dashboard", use_container_width=True, type="primary"):
+            reset_dashboard_cache()
+        if st.button("🧱 Rebuild tablas Hive demo", use_container_width=True):
+            st.code(run_script("scripts/66_rebuild_hive_demo_tables.sh")[-3000:])
+        if st.button("📦 Cargar Cassandra latest state", use_container_width=True):
+            st.code(run_script("scripts/65_load_vehicle_latest_state_cassandra.sh")[-3000:])
+
+    st.divider()
+
+    with st.expander("⚙️ Estado del Stack y Enlaces", expanded=False):
+        for row in service_rows:
+            icon = {"OK": "🟢", "NOK": "🔴", "BOOT": "🟠", "OFF": "⚫"}.get(row["badge"], "⚪")
+            st.markdown(f"{icon} **{row['service']}** · {row['badge']}")
+        st.markdown("---")
+        st.markdown(
+            """
+            - NiFi: `https://localhost:8443`
+            - Airflow: `http://localhost:8085`
+            - NameNode: `http://localhost:9870`
+            - Spark UI: `http://localhost:4040`
+            - Cassandra: `localhost:9042`
+            """
+        )
+        if st.button("▶️ Arrancar Servicios", use_container_width=True, type="primary"):
+            st.code(run_command(DOCKER_COMPOSE + ["up", "-d", "postgres", "kafka", "nifi", "spark", "cassandra", "namenode", "datanode", "airflow-webserver"], timeout=600).stdout)
+            st.cache_data.clear()
+        if st.button("⏹️ Parar Servicios", use_container_width=True):
+            st.code(run_command(DOCKER_COMPOSE + ["down"], timeout=600).stdout)
+            st.cache_data.clear()
 
 bundle = get_dashboard_bundle()
 ok_count = sum(1 for row in service_rows if row["badge"] == "OK")
@@ -1320,6 +1323,9 @@ nok_count = sum(1 for row in service_rows if row["badge"] == "NOK")
 off_count = sum(1 for row in service_rows if row["badge"] == "OFF")
 critical_alerts, medium_alerts, avg_delay = summarize_risk(bundle)
 kpis = build_control_tower_kpis(bundle)
+selected_week = "Todas"
+selected_customer = "Todos"
+current_page = st.session_state.get("vista_actual", "1. Resumen Ejecutivo")
 
 hero_left, hero_right = st.columns([1.7, 0.9])
 with hero_left:
@@ -1365,7 +1371,8 @@ with metric_cols[4]:
 with metric_cols[5]:
     render_card("Referencias críticas", str(kpis['critical_refs']), "Riesgo de rotura de stock")
 
-current_page = st.session_state.get("dashboard_page", "1. Resumen Ejecutivo")
+AIR_CONTINGENCY_MIN_TIME_SAVED_HOURS = 24
+AIR_CONTINGENCY_MAX_COST_EUR = 18000
 
 if current_page == "1. Resumen Ejecutivo":
     alerts_df = pd.DataFrame(bundle.get("fact_alerts", []))
@@ -1534,9 +1541,18 @@ if current_page == "1. Resumen Ejecutivo":
         st.subheader("Impacto de Contingencias Multimodales")
         air_time_saved = max(round(float(fleet_df["eta_hours"].mean()) - float(air_df["air_eta_hours"].mean()), 1), 0)
         air_investment = round(float(air_df["air_cost_eur"].mean()), 0)
-        st.success(
-            "La analítica predictiva anticipa cuellos de botella logísticos y activa rutas aéreas solo cuando el riesgo operacional supera el umbral económico. Esto reduce roturas, protege OTIF y evita decisiones reactivas de alto coste."
+        air_rule_triggered = (
+            air_time_saved >= AIR_CONTINGENCY_MIN_TIME_SAVED_HOURS
+            and air_investment <= AIR_CONTINGENCY_MAX_COST_EUR
         )
+        if air_rule_triggered:
+            st.success(
+                f"Regla activa: se recomienda contingencia aérea cuando el ahorro estimado es >= {AIR_CONTINGENCY_MIN_TIME_SAVED_HOURS} h y la inversión media es <= {AIR_CONTINGENCY_MAX_COST_EUR:,.0f} EUR. La situación actual cumple el umbral y justifica la activación predictiva."
+            )
+        else:
+            st.info(
+                f"Regla operativa: activar aéreo solo si el ahorro estimado es >= {AIR_CONTINGENCY_MIN_TIME_SAVED_HOURS} h y la inversión media es <= {AIR_CONTINGENCY_MAX_COST_EUR:,.0f} EUR. La situación actual no cumple completamente ese umbral económico."
+            )
         roi_col1, roi_col2 = st.columns(2)
         roi_col1.metric("Ahorro de Tiempo Estimado (Horas)", f"{air_time_saved} h", delta="respuesta predictiva")
         roi_col2.metric("Inversión en Rutas Aéreas (EUR)", f"{air_investment:,.0f} €", delta="priorización inteligente")

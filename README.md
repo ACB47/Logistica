@@ -92,9 +92,11 @@ El proyecto está **completamente dockerizado** para ejecutarse en cualquier ord
 - Incluye:
   - estado de servicios `OK/NOK/OFF`
   - botones de arranque/parada por servicio
+  - menú lateral corporativo con navegación por botones
   - mapa de barcos y rutas con alertas
   - pestañas con diagrama KDD, secuencia, clases y casos de uso
   - tablas de `fact_alerts`, `fact_weather_operational` y `fact_graph_centrality`
+  - portada ejecutiva con regla explícita de contingencia aérea (`>= 24h` ahorro y `<= 18.000 EUR` inversión media)
 
 ## Stack tecnológico (rúbrica cumplida)
 

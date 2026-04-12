@@ -3,8 +3,8 @@
 Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el repo.
 
 ## Ultima actualizacion
-- Fecha de referencia: 2026-04-11
-- Contexto: estabilización del stack de servicios para demo local, migración operativa a `docker compose`, optimización de recursos Docker/Spark y rediseño ejecutivo de la portada del dashboard.
+- Fecha de referencia: 2026-04-12
+- Contexto: refactor del sidebar Streamlit con navegación por botones y ajuste de la regla económica visible en la portada ejecutiva.
 
 ## Resumen ejecutivo
 - El proyecto ya tiene una base funcional de demo: productores Kafka, landing raw en HDFS, jobs Spark batch, tablas Hive, soporte Cassandra, notebooks Zeppelin y un DAG de Airflow.
@@ -52,6 +52,9 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - Se añadió `jobs/spark/spark_config.py` como configuración compartida de Spark local con menos memoria y menos particiones shuffle.
 - La portada `Resumen Ejecutivo` del dashboard fue rediseñada con KPIs gerenciales, donuts operativos, área de proyección y panel ROI de contingencias con fallback visual para demo.
 - El panel de servicios del dashboard ya detecta correctamente los nombres actuales de contenedores de Docker Compose v2 (`logistica-*-1`).
+- El sidebar ya no usa `radio`; ahora navega con botones homogéneos apoyados en `st.session_state["vista_actual"]`.
+- Se eliminó del sidebar la sección de parámetros de demo (`Factor de demanda`, `Retraso ETA`, `Semana industrial`, `Cliente destino`) para simplificar la defensa y mantener foco ejecutivo.
+- La regla económica de contingencia aérea quedó explicitada en la portada: activar solo si el ahorro estimado es `>= 24h` y la inversión media `<= 18.000 EUR`.
 - Lo mas importante pendiente ahora es cerrar evidencias, Airflow visual, narrativa final de defensa y documentacion completa sobre la ruta Docker/local.
 - Se añadieron nuevas pestañas al dashboard Streamlit:
   - `10. Alertas y Contingencias`: Panel de alertas críticas (fact_alerts), tabla interactiva de decisión (fact_air_recovery_options), scatter plot de IA (coste vs tiempo), mapa de contingencia multimodal con rutas marítimas y desviaciones aéreas.
@@ -92,6 +95,13 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
   1. Rediseño de `Resumen Ejecutivo`
   2. Fix del panel de estado de servicios con nombres Compose v2
   3. Fallbacks de datos para demos sin conexión completa
+
+## Recientes mejoras (2026-04-12)
+- **Sidebar corporativo**:
+  1. Cabecera institucional `CONTROL TOWER ANACO`
+  2. Navegación agrupada por bloques con botones de ancho uniforme
+  3. Acciones globales destacadas
+  4. Estado del stack y enlaces técnicos dentro de un expander final
 
 ## Estado por fases KDD
 
