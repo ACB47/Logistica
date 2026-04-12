@@ -415,10 +415,27 @@ def get_service_status() -> list[dict[str, str]]:
 def compose_service_action(service: str, action: str) -> str:
     if action == "start":
         result = run_command(DOCKER_COMPOSE + ["up", "-d", service], timeout=600)
+        output = result.stdout or result.stderr or f"{action} {service} ejecutado"
+        if service == "nifi":
+            healthcheck = run_command(["bash", "scripts/61_nifi_healthcheck.sh"], timeout=300)
+            bootstrap = run_command(
+                ["env", "START_NIFI_FLOW=1", "python3", "scripts/62_bootstrap_nifi_open_meteo_flow.py"],
+                timeout=600,
+            )
+            output = "\n\n".join(
+                part
+                for part in [
+                    output,
+                    healthcheck.stdout or healthcheck.stderr,
+                    bootstrap.stdout or bootstrap.stderr,
+                ]
+                if part
+            )
     else:
         result = run_command(DOCKER_COMPOSE + ["stop", service], timeout=300)
+        output = result.stdout or result.stderr or f"{action} {service} ejecutado"
     st.cache_data.clear()
-    return result.stdout or result.stderr or f"{action} {service} ejecutado"
+    return output
 
 
 def run_script(script: str) -> str:
@@ -1311,7 +1328,8 @@ with st.sidebar:
             """
         )
         if st.button("▶️ Arrancar Servicios", use_container_width=True, type="primary"):
-            st.code(run_command(DOCKER_COMPOSE + ["up", "-d", "postgres", "kafka", "nifi", "spark", "cassandra", "namenode", "datanode", "airflow-webserver"], timeout=600).stdout)
+            st.code(compose_service_action("nifi", "start"))
+            st.code(run_command(DOCKER_COMPOSE + ["up", "-d", "postgres", "kafka", "spark", "cassandra", "namenode", "datanode", "airflow-webserver"], timeout=600).stdout)
             st.cache_data.clear()
         if st.button("⏹️ Parar Servicios", use_container_width=True):
             st.code(run_command(DOCKER_COMPOSE + ["down"], timeout=600).stdout)
@@ -2119,9 +2137,34 @@ elif current_page == "2. Control Tower Valladolid":
             st.plotly_chart(fig_gantt, use_container_width=True)
 
 elif current_page == "3. Arquitectura en vivo":
-    st.markdown("# <div style='text-align:center;'>2026: Predictive Logistics</div>", unsafe_allow_html=True)
-    st.info("ℹ️ **Centro de control del pipeline KDD:** posición de flota, riesgo meteorológico, alertas operativas, contingencia aérea, estado de servicios y analítica de red.")
-    st.markdown("`NiFi` ➔ `Kafka` ➔ `Spark + Hive` ➔ `Cassandra` ➔ `GraphFrames` ➔ `Air Recovery` ➔ `Airflow`")
+    hero_left, hero_right = st.columns([1.7, 0.9])
+    with hero_left:
+        st.markdown("# 2026: Predictive Logistics")
+        st.markdown(
+            "Centro de control del pipeline KDD: posicion de flota, riesgo meteorologico, alertas operativas, contingencia aerea, estado de servicios y analitica de red.",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            """
+            <div>
+              <a href="https://localhost:8443" target="_blank" style="text-decoration:none;"><span class='tag-chip'>NiFi</span></a>
+              <span class='tag-chip' title='Kafka expone broker TCP en localhost:9092, no una consola web'>Kafka</span>
+              <a href="http://localhost:8080" target="_blank" style="text-decoration:none;"><span class='tag-chip'>Spark + Hive</span></a>
+              <span class='tag-chip' title='Cassandra expone CQL en localhost:9042, no una consola web'>Cassandra</span>
+              <a href="http://localhost:8080" target="_blank" style="text-decoration:none;"><span class='tag-chip'>GraphFrames</span></a>
+              <a href="http://localhost:8501" target="_blank" style="text-decoration:none;"><span class='tag-chip'>Air Recovery</span></a>
+              <a href="http://localhost:8085" target="_blank" style="text-decoration:none;"><span class='tag-chip'>Airflow</span></a>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with hero_right:
+        render_panel(
+            "Estado del pipeline",
+            "sincronizado",
+            f"Snapshots servidos desde Spark/Hive, HDFS y Cassandra.<br/><br/><strong>Servicios OK:</strong> {ok_count}/{len(service_rows)}<br/><strong>Riesgo medio:</strong> {'MEDIUM' if medium_alerts else 'LOW'}<br/><strong>Storage:</strong> HDFS + Hive",
+            height=250,
+        )
     st.divider()
 
     with st.container(border=True):
@@ -2135,7 +2178,8 @@ elif current_page == "3. Arquitectura en vivo":
 
     stack_action_cols = st.columns(3)
     if stack_action_cols[0].button("▶️ Arrancar todos los servicios", use_container_width=True, type="primary"):
-        st.code(run_command(DOCKER_COMPOSE + ["up", "-d", "postgres", "kafka", "nifi", "spark", "cassandra", "namenode", "datanode", "airflow-webserver"], timeout=600).stdout)
+        st.code(compose_service_action("nifi", "start"))
+        st.code(run_command(DOCKER_COMPOSE + ["up", "-d", "postgres", "kafka", "spark", "cassandra", "namenode", "datanode", "airflow-webserver"], timeout=600).stdout)
         st.cache_data.clear()
     if stack_action_cols[1].button("⏯️ Arrancar Servicios Lite", use_container_width=True):
         st.code(run_command(DOCKER_COMPOSE + ["up", "-d", "kafka", "namenode", "datanode", "spark"], timeout=600).stdout)

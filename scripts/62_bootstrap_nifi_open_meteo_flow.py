@@ -147,6 +147,10 @@ def refresh_controller_service(service_id: str, headers: dict[str, str]) -> dict
     return api_call(f"/controller-services/{service_id}", headers=headers)
 
 
+def get_process_group_flow(group_id: str, headers: dict[str, str]) -> dict:
+    return api_call(f"/flow/process-groups/{group_id}", headers=headers)
+
+
 def update_processor(
     processor_id: str,
     revision: int,
@@ -221,8 +225,52 @@ def main() -> int:
         pg for pg in root["processGroupFlow"]["flow"]["processGroups"] if pg["component"]["name"] == FLOW_NAME
     ]
     if existing:
-        print(f"El flujo '{FLOW_NAME}' ya existe en NiFi. Borralo manualmente o cambia NIFI_FLOW_NAME.")
-        return 1
+        group_id = existing[0]["component"]["id"]
+        print(f"El flujo '{FLOW_NAME}' ya existe en NiFi: {group_id}")
+        if not START_FLOW:
+            print("El flujo ya existe. No se recrea.")
+            return 0
+
+        group_flow = get_process_group_flow(group_id, headers)
+        processors = {
+            p["component"]["name"]: p
+            for p in group_flow["processGroupFlow"]["flow"].get("processors", [])
+        }
+        controller_services = {
+            s["component"]["name"]: s
+            for s in group_flow["processGroupFlow"]["flow"].get("controllerServices", [])
+        }
+
+        service = controller_services.get("Kafka3ConnectionService")
+        if service:
+            refreshed_service = refresh_controller_service(service["component"]["id"], headers)
+            if refreshed_service["component"].get("state") != "ENABLED":
+                enable_controller_service(
+                    refreshed_service["component"]["id"],
+                    refreshed_service["revision"]["version"],
+                    headers,
+                )
+
+        for name in [
+            "PublishKafka Raw",
+            "PublishKafka Filtered",
+            "JoltTransformJSON Filtered",
+            "RouteOnAttribute Raw",
+            "RouteOnAttribute Filtered",
+            "InvokeHTTP Raw",
+            "InvokeHTTP Filtered",
+            "GenerateFlowFile Raw",
+            "GenerateFlowFile Filtered",
+        ]:
+            processor = processors.get(name)
+            if processor is None:
+                continue
+            refreshed = refresh_processor(processor["component"]["id"], headers)
+            if refreshed["component"].get("state") != "RUNNING":
+                start_processor(refreshed["component"]["id"], refreshed["revision"]["version"], headers)
+        print("Procesadores existentes arrancados.")
+        print("URL NiFi: https://localhost:8443")
+        return 0
 
     process_group = create_process_group(root_id, root_revision, headers)
     group_id = process_group["component"]["id"]
