@@ -146,6 +146,56 @@ def run_command(command: list[str], timeout: int = 120) -> subprocess.CompletedP
     return subprocess.run(command, cwd=ROOT, text=True, capture_output=True, timeout=timeout)
 
 
+def load_local_env() -> dict[str, str]:
+    env_path = ROOT / ".env"
+    values: dict[str, str] = {}
+    if not env_path.exists():
+        return values
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key.strip()] = value.strip().strip('"').strip("'")
+    return values
+
+
+def get_env_value(key: str, default: str | None = None, aliases: list[str] | None = None) -> str | None:
+    aliases = aliases or []
+    for candidate in [key] + aliases:
+        value = os.getenv(candidate)
+        if value:
+            return value
+    env_file = load_local_env()
+    for candidate in [key] + aliases:
+        value = env_file.get(candidate)
+        if value:
+            return value
+    return default
+
+
+def get_smtp_config() -> dict[str, str | int | bool]:
+    host = get_env_value("SMTP_HOST", aliases=["SMTP_SERVER"])
+    port_raw = get_env_value("SMTP_PORT", default="587")
+    user = get_env_value("SMTP_USER")
+    password = get_env_value("SMTP_PASSWORD")
+    recipient = get_env_value("SMTP_RECIPIENT", aliases=["ALERT_RECIPIENT_EMAIL"], default="planificacion@logistica.com")
+    sender_name = get_env_value("SMTP_SENDER_NAME", default="Control Tower ANACO")
+    try:
+        port = int(str(port_raw))
+    except (TypeError, ValueError):
+        port = 587
+    return {
+        "host": host or "",
+        "port": port,
+        "user": user or "",
+        "password": password or "",
+        "recipient": recipient or "",
+        "sender_name": sender_name or "Control Tower ANACO",
+        "configured": bool(host and user and password and recipient),
+    }
+
+
 def render_card(title: str, value: str, subtitle: str, height: int = 155) -> None:
     components.html(
         f"""
@@ -172,7 +222,7 @@ def render_panel(title: str, subtitle: str, body: str, height: int = 230) -> Non
     )
 
 
-def send_critical_alerts_email(alerts_data: list[dict]) -> tuple[bool, str]:
+def send_critical_alerts_email(alerts_data: list[dict], recipient_override: str | None = None) -> tuple[bool, str]:
     """
     Envía un correo electrónico con las alertas críticas de referencias en rotación de stock.
     
@@ -182,18 +232,20 @@ def send_critical_alerts_email(alerts_data: list[dict]) -> tuple[bool, str]:
     Returns:
         Tuple de (éxito: bool, mensaje: str)
     """
-    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_password = os.getenv("SMTP_PASSWORD")
-    recipient_email = os.getenv("SMTP_RECIPIENT", "planificacion@logistica.com")
-    
-    if not smtp_user or not smtp_password:
-        return False, "Falta configurar el SMTP en el archivo .env"
+    smtp_config = get_smtp_config()
+    smtp_server = str(smtp_config["host"])
+    smtp_port = int(smtp_config["port"])
+    smtp_user = str(smtp_config["user"])
+    smtp_password = str(smtp_config["password"])
+    recipient_email = recipient_override.strip() if recipient_override else str(smtp_config["recipient"])
+    sender_name = str(smtp_config["sender_name"])
+
+    if not smtp_config["configured"] or not recipient_email:
+        return False, "Falta configurar SMTP en .env. Revisa SMTP_HOST/SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASSWORD y SMTP_RECIPIENT."
     
     try:
         msg = MIMEMultipart()
-        msg["From"] = smtp_user
+        msg["From"] = f"{sender_name} <{smtp_user}>"
         msg["To"] = recipient_email
         msg["Subject"] = "🚨 ALERTA: Referencias Críticas - Riesgo de Rotura de Stock"
         
@@ -1866,6 +1918,21 @@ elif current_page == "2. Control Tower Valladolid":
         st.metric("Referencias en Riesgo", f"{critical_count}", f"{int(critical_count * 0.3)} requieren acción")
 
     with action_col2:
+        smtp_config = get_smtp_config()
+        recipient_input = st.text_input(
+            "Destinatario de alerta",
+            value=str(smtp_config["recipient"]),
+            placeholder="destinatario@empresa.com",
+            key="control_tower_alert_recipient",
+        )
+        if smtp_config["configured"]:
+            st.success(
+                f"SMTP configurado: {smtp_config['user']} -> {recipient_input or smtp_config['recipient']} ({smtp_config['host']}:{smtp_config['port']})"
+            )
+        else:
+            st.warning(
+                "SMTP no configurado en .env. Define SMTP_HOST o SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASSWORD y SMTP_RECIPIENT para enviar alertas por mail desde Control Tower."
+            )
         if st.button("✉️ Enviar Alertas de Referencias Críticas", type="primary", use_container_width=True):
             with st.spinner("Conectando al servidor SMTP y enviando alertas..."):
                 stock_data = pd.DataFrame(bundle.get("stock_valladolid", []))
@@ -1881,7 +1948,7 @@ elif current_page == "2. Control Tower Valladolid":
                         st.warning("No hay referencias en riesgo crítico para enviar.")
                     else:
                         alerts_for_email = critical_items.to_dict("records")
-                        success, message = send_critical_alerts_email(alerts_for_email)
+                        success, message = send_critical_alerts_email(alerts_for_email, recipient_override=recipient_input)
                         
                         if success:
                             st.balloons()
@@ -4126,91 +4193,3 @@ elif current_page == "11. Ejecución Contingencia Multimodal":
         st.dataframe(vehicle_display, use_container_width=True, hide_index=True, height=150)
     else:
         st.info("No hay datos suficientes para renderizar el mapa de seguimiento.")
-
-
-def send_critical_alerts_email(alerts_data: list[dict]) -> tuple[bool, str]:
-    """
-    Envía un correo electrónico con las alertas críticas de referencias en rotación de stock.
-    
-    Args:
-        alerts_data: Lista de diccionarios con información de las alertas críticas.
-        
-    Returns:
-        Tuple de (éxito: bool, mensaje: str)
-    """
-    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_password = os.getenv("SMTP_PASSWORD")
-    recipient_email = os.getenv("SMTP_RECIPIENT", "planificacion@logistica.com")
-    
-    if not smtp_user or not smtp_password:
-        return False, "Falta configurar el SMTP en el archivo .env"
-    
-    try:
-        msg = MIMEMultipart()
-        msg["From"] = smtp_user
-        msg["To"] = recipient_email
-        msg["Subject"] = "🚨 ALERTA: Referencias Críticas - Riesgo de Rotura de Stock"
-        
-        body = """<!DOCTYPE html>
-<html>
-<head>
-    <style>
-        body { font-family: Arial, sans-serif; }
-        table { border-collapse: collapse; width: 100%; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #dc2626; color: white; }
-        .critical { background-color: #fef2f2; }
-        .warning { background-color: #fffbeb; }
-    </style>
-</head>
-<body>
-    <h2>🚨 Alerta de Referencias Críticas</h2>
-    <p>Se han detectado las siguientes referencias en riesgo de rotación de stock:</p>
-    <table>
-        <tr>
-            <th>ID Artículo</th>
-            <th>Descripción</th>
-            <th>Stock Actual</th>
-            <th>Stock Mínimo</th>
-            <th>Estado</th>
-        </tr>
-"""
-        
-        for alert in alerts_data:
-            article_ref = alert.get("article_ref", "N/A")
-            article_name = alert.get("article_name", "Sin descripción")
-            stock_actual = alert.get("total_stock_pieces", 0)
-            stock_minimo = alert.get("safety_stock_min", 0)
-            estado = alert.get("stock_status", "CRÍTICO")
-            
-            row_class = "critical" if stock_actual <= stock_minimo else "warning"
-            body += f"""        <tr class="{row_class}">
-            <td>{article_ref}</td>
-            <td>{article_name}</td>
-            <td>{stock_actual}</td>
-            <td>{stock_minimo}</td>
-            <td>{estado}</td>
-        </tr>
-"""
-        
-        body += """    </table>
-    <p><strong>Nota:</strong> Se recomienda revisar el plan de contingencia aérea para estas referencias.</p>
-    <hr>
-    <p><small>Este correo fue enviado automáticamente desde el sistema de monitoreo logístico.</small></p>
-</body>
-</html>"""
-        
-        msg.attach(MIMEText(body, "html"))
-        
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-        server.login(smtp_user, smtp_password)
-        server.send_message(msg)
-        server.quit()
-        
-        return True, f"Correo enviado correctamente a {recipient_email}"
-        
-    except Exception as e:
-        return False, f"Error al enviar correo: {str(e)}"

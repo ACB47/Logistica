@@ -4,7 +4,7 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 
 ## Ultima actualizacion
 - Fecha de referencia: 2026-04-12
-- Contexto: actualización de manuales, consolidación del sidebar/documentación del dashboard y corrección de posiciones marítimas de la flota en mapas.
+- Contexto: configuración SMTP visible en Control Tower, destinatario editable desde la UI y actualización de documentación relacionada.
 
 ## Resumen ejecutivo
 - El proyecto ya tiene una base funcional de demo: productores Kafka, landing raw en HDFS, jobs Spark batch, tablas Hive, soporte Cassandra, notebooks Zeppelin y un DAG de Airflow.
@@ -60,6 +60,7 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - La vista de `Arquitectura en vivo` enlaza a consolas web navegables y evita enlaces rotos en servicios sin UI HTTP.
 - Las posiciones GPS visibles de la flota ahora se ajustan a corredores marítimos para evitar barcos sobre tierra.
 - El bundle del dashboard se completa hasta 10 barcos para mantener una demo visual consistente incluso si Hive trae menos registros.
+- `Control Tower Valladolid` ya muestra el estado SMTP, lee `.env` directamente y permite escribir el destinatario del correo antes de enviar alertas críticas.
 - Lo mas importante pendiente ahora es cerrar evidencias, Airflow visual, narrativa final de defensa y documentacion completa sobre la ruta Docker/local.
 - Se añadieron nuevas pestañas al dashboard Streamlit:
   - `10. Alertas y Contingencias`: Panel de alertas críticas (fact_alerts), tabla interactiva de decisión (fact_air_recovery_options), scatter plot de IA (coste vs tiempo), mapa de contingencia multimodal con rutas marítimas y desviaciones aéreas.

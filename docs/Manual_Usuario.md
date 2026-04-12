@@ -74,6 +74,7 @@ Aquí se muestra:
 - ETA de barcos
 - Gantt logístico
 - contingencia aérea
+- envío de alertas SMTP para referencias críticas
 
 ### Paso 3. Usar Control Tower Valladolid
 
@@ -117,7 +118,20 @@ La tabla de contingencia muestra:
 - llegada a Valladolid
 - sobrecoste
 
-## 7. Qué hacer si algo no aparece
+## 7. Alertas por correo desde Control Tower
+
+- La pestaña `Control Tower Valladolid` permite enviar alertas de referencias críticas por email.
+- Antes de enviar, el usuario puede escribir el correo destinatario en el campo `Destinatario de alerta`.
+- Si no se modifica, se usa el valor por defecto configurado en `.env` mediante `SMTP_RECIPIENT`.
+- Para que funcione, deben estar definidas en `.env` estas variables:
+  - `SMTP_HOST` o `SMTP_SERVER`
+  - `SMTP_PORT`
+  - `SMTP_USER`
+  - `SMTP_PASSWORD`
+  - `SMTP_RECIPIENT`
+  - `SMTP_SENDER_NAME`
+
+## 8. Qué hacer si algo no aparece
 
 Si el dashboard no refleja los últimos cambios:
 
@@ -128,7 +142,7 @@ docker compose exec -T spark spark-submit /home/jovyan/jobs/spark/99_dashboard_b
 
 Y después refrescar el navegador.
 
-## 8. Flota y mapas
+## 9. Flota y mapas
 
 - El dashboard muestra 10 barcos en total durante la demo.
 - Las posiciones GPS visibles en mapa están ajustadas para seguir corredores marítimos y mantenerse sobre agua.

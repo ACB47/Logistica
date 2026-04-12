@@ -96,6 +96,7 @@ Diseño y experiencia visual del dashboard:
 - Menú lateral jerárquico con navegación por botones, identidad de marca y accesos técnicos del stack.
 - Portada `Resumen Ejecutivo` con KPIs, donuts operativos, proyección visual y regla económica explícita de contingencia aérea.
 - Vista `Control Tower Valladolid` con enfoque operacional: stock, cobertura, Gantt industrial y flujo de contingencia multimodal.
+- Vista `Control Tower Valladolid` con enfoque operacional: stock, cobertura, Gantt industrial, flujo de contingencia multimodal y envío SMTP de alertas críticas.
 - Vista `Arquitectura en vivo` con enfoque técnico minimalista: estado del pipeline, controles del stack y lista viva de servicios KDD.
 - Pestañas de auditoría KDD, persistencia, orquestación y evidencias diseñadas para mostrar trazabilidad técnica durante la defensa.
 
@@ -119,6 +120,7 @@ bash scripts/67_run_dashboard.sh
   - pestañas con diagramas KDD, secuencia, clases y casos de uso
   - tablas de `fact_alerts`, `fact_weather_operational` y `fact_graph_centrality`
   - portada ejecutiva con regla explícita de contingencia aérea (`>= 24h` ahorro y `<= 18.000 EUR` inversión media)
+  - envío de alertas por correo desde `Control Tower` con destinatario editable en la UI
 
 ## Stack tecnológico (rúbrica cumplida)
 

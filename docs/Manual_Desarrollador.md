@@ -81,6 +81,7 @@ Notas de implementación recientes:
 - La sección `Arquitectura en vivo` es un panel técnico con control `ON/OFF` por servicio.
 - Al arrancar `nifi` desde el dashboard se ejecuta también el bootstrap del flujo Open-Meteo.
 - `jobs/spark/99_dashboard_bundle.py` completa la flota hasta 10 barcos para garantizar una demo consistente.
+- `Control Tower Valladolid` integra el envío SMTP de alertas críticas con destinatario editable desde la UI.
 
 ## 7. Cómo extender el proyecto
 

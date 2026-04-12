@@ -48,6 +48,7 @@ Elementos visibles:
 - Gantt de cobertura de stock vs ETA marítima
 - tabla de contingencia aérea
 - seguimiento de 10 barcos con nombres reales
+- cuadro `Destinatario de alerta` y botón de envío SMTP para referencias críticas
 
 ### 3.3 Arquitectura en vivo
 
@@ -138,3 +139,18 @@ Si NiFi se levanta desde el dashboard, el flujo Open-Meteo debería arrancar aut
 bash scripts/61_nifi_healthcheck.sh
 python3 scripts/62_bootstrap_nifi_open_meteo_flow.py
 ```
+
+### No se envían correos desde Control Tower
+
+Verificar que `.env` contiene:
+
+```bash
+SMTP_HOST=smtp-mail.outlook.com
+SMTP_PORT=587
+SMTP_USER=tu-email@outlook.com
+SMTP_PASSWORD=tu-password
+SMTP_RECIPIENT=planificacion@empresa.com
+SMTP_SENDER_NAME=Control Tower ANACO
+```
+
+También se puede sobrescribir el destinatario directamente desde el campo `Destinatario de alerta` del dashboard.
