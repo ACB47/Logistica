@@ -81,23 +81,6 @@ El proyecto está **completamente dockerizado** para ejecutarse en cualquier ord
 - Los jobs Spark comparten configuración optimizada en `jobs/spark/spark_config.py`.
 - El dashboard usa `docker compose` v2 y detecta correctamente los nombres de contenedor actuales (`logistica-spark-1`, `logistica-kafka-1`, etc.).
 
-## Dashboard de defensa
-
-- Stack elegido: `Streamlit`
-- Motivo: menor complejidad para dashboard, mapas, estados de servicio y paneles KDD.
-- Ejecucion:
-  - `bash scripts/67_run_dashboard.sh`
-- Si el dashboard aparece vacio, levantar primero el stack HDFS y regenerar el bundle.
-- Si el panel de servicios no refleja cambios recientes, refrescar la página o esperar el TTL de caché de 15 segundos.
-- Incluye:
-  - estado de servicios `OK/NOK/OFF`
-  - botones de arranque/parada por servicio
-  - menú lateral corporativo con navegación por botones
-  - mapa de barcos y rutas con alertas
-  - pestañas con diagrama KDD, secuencia, clases y casos de uso
-  - tablas de `fact_alerts`, `fact_weather_operational` y `fact_graph_centrality`
-  - portada ejecutiva con regla explícita de contingencia aérea (`>= 24h` ahorro y `<= 18.000 EUR` inversión media)
-
 ## DASHBOARD
 
 Código fuente Python del dashboard:
@@ -115,6 +98,27 @@ Diseño y experiencia visual del dashboard:
 - Vista `Control Tower Valladolid` con enfoque operacional: stock, cobertura, Gantt industrial y flujo de contingencia multimodal.
 - Vista `Arquitectura en vivo` con enfoque técnico minimalista: estado del pipeline, controles del stack y lista viva de servicios KDD.
 - Pestañas de auditoría KDD, persistencia, orquestación y evidencias diseñadas para mostrar trazabilidad técnica durante la defensa.
+
+Operación del dashboard:
+
+- Stack elegido: `Streamlit`
+- Ejecución:
+
+```bash
+bash scripts/67_run_dashboard.sh
+```
+
+- Si el dashboard aparece vacío, levantar primero el stack HDFS y regenerar el bundle.
+- Si el panel de servicios no refleja cambios recientes, refrescar la página o esperar el TTL de caché de 15 segundos.
+- Incluye:
+  - estado de servicios `OK/NOK/OFF`
+  - botones de arranque/parada por servicio
+  - menú lateral corporativo con navegación por botones
+  - visor integrado de documentación Markdown
+  - mapa de barcos y rutas con alertas
+  - pestañas con diagramas KDD, secuencia, clases y casos de uso
+  - tablas de `fact_alerts`, `fact_weather_operational` y `fact_graph_centrality`
+  - portada ejecutiva con regla explícita de contingencia aérea (`>= 24h` ahorro y `<= 18.000 EUR` inversión media)
 
 ## Stack tecnológico (rúbrica cumplida)
 
@@ -196,28 +200,6 @@ Open-Meteo -> NiFi -> Kafka (datos_crudos / datos_filtrados)
 | `logistica.fact_customer_orders_douai` | Hive fact | pedidos del cliente de Douai por semana industrial |
 | `logistica.fact_article_gantt` | Hive fact | planificación por artículo y modo logístico |
 
-## Dashboard
-
-- Stack elegido: `Streamlit`
-- Objetivo: facilitar la exposición del flujo KDD con una sola interfaz.
-- El dashboard incluye:
-  - estado de servicios `OK / NOK / OFF`
-  - botones para arrancar y parar servicios
-  - mapa con puertos, rutas y barcos
-  - alertas operativas por ruta/puerto
-  - tablas de `fact_alerts`, `fact_weather_operational`, `fact_graph_centrality` y `vehicle_latest_state`
-  - diagramas de flujo, secuencia, clases y casos de uso
-  - comparativa `barco vs aereo+camion` con ETA, coste total y riesgo de stock
-  - panel de stock de Valladolid por referencia de artículo
-  - pedidos del cliente de Douai
-  - Gantt por semanas industriales
-
-- Ejecución:
-
-```bash
-bash scripts/67_run_dashboard.sh
-```
-
 ## Estructura del proyecto
 
 ```
@@ -293,18 +275,18 @@ Además, la demo permite:
 
 ## Interactividad del dashboard
 
-El dashboard permite filtros y simulaciones en tiempo de demo:
+El dashboard permite navegación y simulaciones en tiempo de demo:
 
-- cliente destino: `Douai` o `Cleon`
-- semana industrial
-- barco concreto
+- navegación por vistas desde el sidebar
+- visor integrado de documentación técnica
+- selección de barco concreto en las vistas operativas
 - incidencias activables por barco
-- visualización GPS de barcos desde `Shanghai` y `Yokohama`
+- visualización GPS de 10 barcos desde `Shanghai` y `Yokohama`
 
-Con estos controles se recalculan:
+Con estos controles se recalculan o actualizan:
 
-- pedidos visibles
-- stock de Valladolid
+- ETA visible
+- estado de cobertura
 - horizonte de 10 semanas
 - Gantt de cobertura
 - propuesta de contingencia aérea

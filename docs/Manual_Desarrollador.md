@@ -26,8 +26,7 @@ El proyecto sigue una arquitectura Docker/local con estos componentes principale
 - `jobs/cassandra/`: definición del esquema Cassandra.
 - `airflow/dags/`: DAGs de orquestación.
 - `dashboard/`: aplicación Streamlit.
-- `docs/`: documentación general.
-- `DOCUMENTACION/`: manuales orientados a entrega.
+- `docs/`: documentación general y manuales orientados a entrega.
 - `scripts/`: scripts auxiliares de arranque, rebuild y carga.
 
 ## 4. Jobs Spark relevantes
@@ -55,7 +54,7 @@ bash scripts/66_rebuild_hive_demo_tables.sh
 - Si el dashboard no refleja cambios nuevos, regenerar el bundle:
 
 ```bash
-docker-compose exec -T spark spark-submit /home/jovyan/jobs/spark/99_dashboard_bundle.py
+docker compose exec -T spark spark-submit /home/jovyan/jobs/spark/99_dashboard_bundle.py
 ```
 
 ## 6. Dashboard
@@ -70,10 +69,18 @@ La Control Tower utiliza datos reales o simulados del proyecto para:
 
 - stock Valladolid
 - pedidos de Douai y Cleon
-- ETA de barcos
+- ETA de 10 barcos y su progreso de viaje
 - contingencia aérea
 - Gantt de cobertura y planificación
 - estado de servicios
+- mapas marítimos con posiciones GPS ajustadas a corredores sobre agua
+
+Notas de implementación recientes:
+
+- El sidebar Streamlit navega con `st.session_state["vista_actual"]` y botones homogéneos.
+- La sección `Arquitectura en vivo` es un panel técnico con control `ON/OFF` por servicio.
+- Al arrancar `nifi` desde el dashboard se ejecuta también el bootstrap del flujo Open-Meteo.
+- `jobs/spark/99_dashboard_bundle.py` completa la flota hasta 10 barcos para garantizar una demo consistente.
 
 ## 7. Cómo extender el proyecto
 
@@ -101,8 +108,8 @@ Editar en `01_load_master_dimensions.py`:
 Después ejecutar:
 
 ```bash
-docker-compose exec -T spark spark-submit /home/jovyan/jobs/spark/01_load_master_dimensions.py
-docker-compose exec -T spark spark-submit /home/jovyan/jobs/spark/99_dashboard_bundle.py
+docker compose exec -T spark spark-submit /home/jovyan/jobs/spark/01_load_master_dimensions.py
+docker compose exec -T spark spark-submit /home/jovyan/jobs/spark/99_dashboard_bundle.py
 ```
 
 ### Añadir nuevas incidencias de barco
@@ -120,25 +127,25 @@ Bloque:
 Levantar stack completo:
 
 ```bash
-docker-compose up -d postgres kafka nifi spark cassandra namenode datanode airflow-webserver
+docker compose up -d postgres kafka nifi spark cassandra namenode datanode airflow-webserver
 ```
 
 Parar stack:
 
 ```bash
-docker-compose down
+docker compose down
 ```
 
 Ver tablas Hive:
 
 ```bash
-docker-compose exec -T spark bash -lc 'spark-sql -S -e "SHOW TABLES IN logistica" 2>/dev/null'
+docker compose exec -T spark bash -lc 'spark-sql -S -e "SHOW TABLES IN logistica" 2>/dev/null'
 ```
 
 Ver estado Cassandra:
 
 ```bash
-docker-compose exec -T cassandra cqlsh -e "SELECT * FROM logistica.vehicle_latest_state;"
+docker compose exec -T cassandra cqlsh -e "SELECT * FROM logistica.vehicle_latest_state;"
 ```
 
 ## 9. Nota final

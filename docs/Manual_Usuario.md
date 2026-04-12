@@ -20,7 +20,7 @@ El usuario puede:
 Desde la carpeta raíz:
 
 ```bash
-docker-compose up -d postgres kafka nifi spark cassandra namenode datanode airflow-webserver
+docker compose up -d postgres kafka nifi spark cassandra namenode datanode airflow-webserver
 ```
 
 Después, para abrir el dashboard:
@@ -43,11 +43,19 @@ El dashboard está organizado por secciones:
 - Orquestación
 - Evidencias KDD
 
+La barra lateral actual incluye:
+
+- identidad corporativa `CONTROL TOWER ANACO`
+- navegación por botones
+- acciones globales
+- estado del stack y enlaces técnicos
+- sección de documentación
+
 ## 4. Uso recomendado
 
 ### Paso 1. Revisar servicios
 
-En la barra lateral se puede comprobar si están activos:
+En la barra lateral, dentro de `Estado del Stack y Enlaces`, se puede comprobar si están activos:
 
 - Kafka
 - NiFi
@@ -67,26 +75,11 @@ Aquí se muestra:
 - Gantt logístico
 - contingencia aérea
 
-### Paso 3. Filtrar por cliente
+### Paso 3. Usar Control Tower Valladolid
 
-En la barra lateral se puede seleccionar:
+La vista principal muestra el stock, la cobertura y el seguimiento de la flota sin depender ya de filtros laterales globales.
 
-- `Douai`
-- `Cleon`
-- `Todos`
-
-El contenido cambia según el cliente elegido.
-
-### Paso 4. Filtrar por semana industrial
-
-La vista permite escoger una semana concreta para revisar:
-
-- pedidos
-- stock
-- cobertura
-- planificación
-
-### Paso 5. Simular incidencias por barco
+### Paso 4. Simular incidencias por barco
 
 En la pestaña de ingesta se puede seleccionar un barco y activar incidencias como:
 
@@ -104,13 +97,7 @@ El sistema recalcula:
 - si cubre o no cubre
 - recomendación de contingencia aérea
 
-## 5. Colores y significado
-
-### Stock
-
-- Verde: stock suficiente
-- Naranja: stock tensionado
-- Rojo: riesgo de rotura
+## 5. Estados y significado
 
 ### Servicios
 
@@ -135,8 +122,14 @@ La tabla de contingencia muestra:
 Si el dashboard no refleja los últimos cambios:
 
 ```bash
-docker-compose exec -T spark spark-submit /home/jovyan/jobs/spark/01_load_master_dimensions.py
-docker-compose exec -T spark spark-submit /home/jovyan/jobs/spark/99_dashboard_bundle.py
+docker compose exec -T spark spark-submit /home/jovyan/jobs/spark/01_load_master_dimensions.py
+docker compose exec -T spark spark-submit /home/jovyan/jobs/spark/99_dashboard_bundle.py
 ```
 
 Y después refrescar el navegador.
+
+## 8. Flota y mapas
+
+- El dashboard muestra 10 barcos en total durante la demo.
+- Las posiciones GPS visibles en mapa están ajustadas para seguir corredores marítimos y mantenerse sobre agua.
+- Si se arranca `nifi` desde el dashboard, también se lanza automáticamente el flujo Open-Meteo del proyecto.

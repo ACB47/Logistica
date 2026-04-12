@@ -469,10 +469,132 @@ def reset_dashboard_cache() -> None:
     st.rerun()
 
 
+def mostrar_documento_md(ruta_archivo: str) -> None:
+    ruta = ROOT / ruta_archivo
+    st.title(Path(ruta_archivo).name)
+    if not ruta.exists():
+        st.warning(f"No se encontró el documento: {ruta_archivo}")
+        return
+    st.markdown(ruta.read_text(encoding="utf-8"))
+
+
+SEA_ROUTE_CORRIDORS: dict[str, list[tuple[float, float]]] = {
+    "route-shanghai-algeciras": [
+        (31.2304, 121.4737),
+        (22.0, 118.0),
+        (13.0, 103.0),
+        (6.0, 80.0),
+        (12.0, 56.0),
+        (18.0, 44.0),
+        (12.0, 32.0),
+        (20.0, 4.0),
+        (36.1270, -5.4530),
+    ],
+    "route-shanghai-valencia": [
+        (31.2304, 121.4737),
+        (22.0, 118.0),
+        (13.0, 103.0),
+        (6.0, 80.0),
+        (12.0, 56.0),
+        (18.0, 44.0),
+        (12.0, 32.0),
+        (20.0, 2.0),
+        (39.4580, -0.3170),
+    ],
+    "route-shanghai-barcelona": [
+        (31.2304, 121.4737),
+        (22.0, 118.0),
+        (13.0, 103.0),
+        (6.0, 80.0),
+        (12.0, 56.0),
+        (18.0, 44.0),
+        (12.0, 32.0),
+        (20.0, 5.0),
+        (41.3520, 2.1730),
+    ],
+    "route-yokohama-algeciras": [
+        (35.4437, 139.6380),
+        (30.0, 132.0),
+        (18.0, 118.0),
+        (8.0, 92.0),
+        (6.0, 78.0),
+        (12.0, 56.0),
+        (18.0, 44.0),
+        (12.0, 32.0),
+        (20.0, 4.0),
+        (36.1270, -5.4530),
+    ],
+    "route-yokohama-valencia": [
+        (35.4437, 139.6380),
+        (30.0, 132.0),
+        (18.0, 118.0),
+        (8.0, 92.0),
+        (6.0, 78.0),
+        (12.0, 56.0),
+        (18.0, 44.0),
+        (12.0, 32.0),
+        (20.0, 2.0),
+        (39.4580, -0.3170),
+    ],
+    "route-yokohama-barcelona": [
+        (35.4437, 139.6380),
+        (30.0, 132.0),
+        (18.0, 118.0),
+        (8.0, 92.0),
+        (6.0, 78.0),
+        (12.0, 56.0),
+        (18.0, 44.0),
+        (12.0, 32.0),
+        (20.0, 5.0),
+        (41.3520, 2.1730),
+    ],
+}
+
+
+def interpolate_sea_route(route_id: str, progress: float) -> tuple[float, float] | None:
+    points = SEA_ROUTE_CORRIDORS.get(str(route_id))
+    if not points or len(points) < 2:
+        return None
+    progress = max(0.0, min(1.0, float(progress)))
+    segment_count = len(points) - 1
+    scaled = progress * segment_count
+    seg_index = min(int(scaled), segment_count - 1)
+    local_t = scaled - seg_index
+    start_lat, start_lon = points[seg_index]
+    end_lat, end_lon = points[seg_index + 1]
+    lat = start_lat + ((end_lat - start_lat) * local_t)
+    lon = start_lon + ((end_lon - start_lon) * local_t)
+    return round(lat, 6), round(lon, 6)
+
+
+def normalize_ship_positions(ships: pd.DataFrame) -> pd.DataFrame:
+    if ships.empty or not {"route_id", "lat", "lon"}.issubset(ships.columns):
+        return ships
+    ships = ships.copy()
+    for idx, row in ships.iterrows():
+        corridor = SEA_ROUTE_CORRIDORS.get(str(row.get("route_id", "")))
+        if not corridor:
+            continue
+        origin = corridor[0]
+        dest = corridor[-1]
+        lat = float(row.get("lat", origin[0]))
+        lon = float(row.get("lon", origin[1]))
+        denom = abs(dest[0] - origin[0]) + abs(dest[1] - origin[1])
+        if denom <= 0:
+            progress = 0.0
+        else:
+            progress = ((abs(lat - origin[0]) + abs(lon - origin[1])) / denom)
+        snapped = interpolate_sea_route(str(row.get("route_id")), progress)
+        if snapped:
+            ships.at[idx, "lat"] = snapped[0]
+            ships.at[idx, "lon"] = snapped[1]
+    return ships
+
+
 def build_map_data(bundle: dict) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     ports = pd.DataFrame(bundle.get("dim_ports", []))
     routes = pd.DataFrame(bundle.get("dim_routes", []))
-    ships = pd.DataFrame(bundle.get("ships_latest", []))
+    ships = normalize_ship_positions(pd.DataFrame(bundle.get("ships_latest", [])))
     alerts = pd.DataFrame(bundle.get("fact_alerts", []))
 
     if not routes.empty and not ports.empty:
@@ -1335,6 +1457,20 @@ with st.sidebar:
             st.code(run_command(DOCKER_COMPOSE + ["down"], timeout=600).stdout)
             st.cache_data.clear()
 
+    st.divider()
+
+    st.markdown("### 📄 Documentación")
+    if st.button("Readme.md", use_container_width=True):
+        st.session_state["vista_actual"] = "DOC_README"
+    if st.button("Manual de desarrollador", use_container_width=True):
+        st.session_state["vista_actual"] = "DOC_DEV"
+    if st.button("Manual de Usuario Gráfico", use_container_width=True):
+        st.session_state["vista_actual"] = "DOC_GUI"
+    if st.button("Manual de Usuario", use_container_width=True):
+        st.session_state["vista_actual"] = "DOC_USER"
+
+    st.sidebar.markdown("<br><br><div style='text-align: center; color: grey; font-size: 0.8em;'>Diseñado e implementado por: Ana Coloma Bausela - 2026</div>", unsafe_allow_html=True)
+
 bundle = get_dashboard_bundle()
 ok_count = sum(1 for row in service_rows if row["badge"] == "OK")
 nok_count = sum(1 for row in service_rows if row["badge"] == "NOK")
@@ -1344,8 +1480,9 @@ kpis = build_control_tower_kpis(bundle)
 selected_week = "Todas"
 selected_customer = "Todos"
 current_page = st.session_state.get("vista_actual", "1. Resumen Ejecutivo")
+doc_views = {"DOC_README", "DOC_DEV", "DOC_GUI", "DOC_USER"}
 
-if current_page != "3. Arquitectura en vivo":
+if current_page not in doc_views and current_page != "3. Arquitectura en vivo":
     hero_left, hero_right = st.columns([1.7, 0.9])
     with hero_left:
         st.markdown("<div class='hero-eyebrow'>BIG DATA TRANSPORT MONITOR</div>", unsafe_allow_html=True)
@@ -1393,7 +1530,19 @@ if current_page != "3. Arquitectura en vivo":
 AIR_CONTINGENCY_MIN_TIME_SAVED_HOURS = 24
 AIR_CONTINGENCY_MAX_COST_EUR = 18000
 
-if current_page == "1. Resumen Ejecutivo":
+if current_page == "DOC_README":
+    mostrar_documento_md("README.md")
+
+elif current_page == "DOC_DEV":
+    mostrar_documento_md("docs/Manual_Desarrollador.md")
+
+elif current_page == "DOC_GUI":
+    mostrar_documento_md("docs/Manual_Usuario_Grafico.md")
+
+elif current_page == "DOC_USER":
+    mostrar_documento_md("docs/Manual_Usuario.md")
+
+elif current_page == "1. Resumen Ejecutivo":
     alerts_df = pd.DataFrame(bundle.get("fact_alerts", []))
     stock_df = pd.DataFrame(bundle.get("stock_valladolid", []))
     air_df = pd.DataFrame(bundle.get("fact_air_recovery_options", []))
@@ -1717,6 +1866,10 @@ elif current_page == "2. Control Tower Valladolid":
         "ship-004": "ONE Apus",
         "ship-005": "Maersk Eindhoven",
         "ship-006": "Ever Given",
+        "ship-007": "HMM Algeciras",
+        "ship-008": "Madrid Maersk",
+        "ship-009": "CMA CGM Marco Polo",
+        "ship-010": "MSC Irina",
     }
 
     fleet_left, fleet_right = st.columns([3, 1])
@@ -1733,10 +1886,16 @@ elif current_page == "2. Control Tower Valladolid":
         selected_ship = st.selectbox("Seleccionar barco", ship_options, key="fleet_ship_select")
 
     with fleet_right:
-        fleet_status_df = pd.DataFrame({
-            "Estado": ["Activos", "En Alerta", "En Puerto"],
-            "Cantidad": [4, 1, 1]
-        })
+        total_ships = len(ships_df) if not ships_df.empty else 10
+        alert_ships = min(2, total_ships)
+        port_ships = max(1, total_ships // 5)
+        active_ships = max(total_ships - alert_ships - port_ships, 0)
+        fleet_status_df = pd.DataFrame(
+            {
+                "Estado": ["Activos", "En Alerta", "En Puerto"],
+                "Cantidad": [active_ships, alert_ships, port_ships],
+            }
+        )
         fig_fleet_status = px.pie(
             fleet_status_df,
             values="Cantidad",

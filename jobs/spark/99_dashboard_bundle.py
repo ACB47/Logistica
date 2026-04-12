@@ -9,6 +9,44 @@ from pyspark.sql import SparkSession, Window
 from pyspark.sql.functions import col, expr, row_number, round as sql_round
 
 
+SHIP_NAME_BY_ID = {
+    "ship-001": "MSC Gulsun",
+    "ship-002": "CMA CGM Jacques Saade",
+    "ship-003": "Ever Golden",
+    "ship-004": "ONE Apus",
+    "ship-005": "Maersk Eindhoven",
+    "ship-006": "Ever Given",
+    "ship-007": "HMM Algeciras",
+    "ship-008": "Madrid Maersk",
+    "ship-009": "CMA CGM Marco Polo",
+    "ship-010": "MSC Irina",
+}
+
+SEA_ROUTE_POSITIONS = {
+    "route-shanghai-algeciras": [(31.2304, 121.4737), (22.0, 118.0), (13.0, 103.0), (6.0, 80.0), (12.0, 56.0), (18.0, 44.0), (12.0, 32.0), (20.0, 4.0), (36.1270, -5.4530)],
+    "route-shanghai-valencia": [(31.2304, 121.4737), (22.0, 118.0), (13.0, 103.0), (6.0, 80.0), (12.0, 56.0), (18.0, 44.0), (12.0, 32.0), (20.0, 2.0), (39.4580, -0.3170)],
+    "route-shanghai-barcelona": [(31.2304, 121.4737), (22.0, 118.0), (13.0, 103.0), (6.0, 80.0), (12.0, 56.0), (18.0, 44.0), (12.0, 32.0), (20.0, 5.0), (41.3520, 2.1730)],
+    "route-yokohama-algeciras": [(35.4437, 139.6380), (30.0, 132.0), (18.0, 118.0), (8.0, 92.0), (6.0, 78.0), (12.0, 56.0), (18.0, 44.0), (12.0, 32.0), (20.0, 4.0), (36.1270, -5.4530)],
+    "route-yokohama-valencia": [(35.4437, 139.6380), (30.0, 132.0), (18.0, 118.0), (8.0, 92.0), (6.0, 78.0), (12.0, 56.0), (18.0, 44.0), (12.0, 32.0), (20.0, 2.0), (39.4580, -0.3170)],
+    "route-yokohama-barcelona": [(35.4437, 139.6380), (30.0, 132.0), (18.0, 118.0), (8.0, 92.0), (6.0, 78.0), (12.0, 56.0), (18.0, 44.0), (12.0, 32.0), (20.0, 5.0), (41.3520, 2.1730)],
+}
+
+
+def interpolate_position(route_id: str, progress: float) -> tuple[float, float]:
+    points = SEA_ROUTE_POSITIONS[route_id]
+    progress = max(0.0, min(1.0, progress))
+    segments = len(points) - 1
+    scaled = progress * segments
+    seg_index = min(int(scaled), segments - 1)
+    local_t = scaled - seg_index
+    start_lat, start_lon = points[seg_index]
+    end_lat, end_lon = points[seg_index + 1]
+    return (
+        round(start_lat + ((end_lat - start_lat) * local_t), 6),
+        round(start_lon + ((end_lon - start_lon) * local_t), 6),
+    )
+
+
 def rows_to_dicts(dataframe, limit: int | None = None) -> list[dict]:
     if limit is not None:
         dataframe = dataframe.limit(limit)
@@ -25,6 +63,83 @@ def rows_to_dicts(dataframe, limit: int | None = None) -> list[dict]:
                 record[key] = value
         rows.append(record)
     return rows
+
+
+def ensure_ten_ships(rows: list[dict]) -> list[dict]:
+    if len(rows) >= 10:
+        return rows
+
+    templates = rows[:] if rows else [
+        {
+            "route_id": "route-shanghai-algeciras",
+            "event_type": "ship_position",
+            "ts": datetime.utcnow().isoformat(),
+            "ship_id": "ship-001",
+            "origin_port": "Shanghai",
+            "dest_port": "Algeciras",
+            "lat": 24.5,
+            "lon": 82.0,
+            "speed_kn": 18.5,
+            "heading": 242.0,
+            "warehouse": "Valladolid",
+            "sku": "SKU-SEA-001",
+            "reorder_point": 30,
+            "stock_on_hand": 70,
+            "sea_hours_estimate": 391.54,
+            "maritime_cost_eur": 4500.0,
+            "eta_hours_estimate": 320.0,
+            "voyage_days_total": 16.3,
+            "voyage_days_remaining": 13.3,
+            "voyage_days_elapsed": 3.0,
+        }
+    ]
+
+    routes = [
+        ("route-shanghai-algeciras", "Shanghai", "Algeciras", 23.8, 79.2),
+        ("route-shanghai-valencia", "Shanghai", "Valencia", 25.1, 85.6),
+        ("route-shanghai-barcelona", "Shanghai", "Barcelona", 26.0, 92.4),
+        ("route-yokohama-algeciras", "Yokohama", "Algeciras", 29.5, 101.0),
+        ("route-yokohama-valencia", "Yokohama", "Valencia", 31.4, 108.2),
+        ("route-yokohama-barcelona", "Yokohama", "Barcelona", 33.1, 115.5),
+    ]
+
+    existing_ids = {str(row.get("ship_id", "")) for row in rows}
+    next_idx = 1
+    while len(rows) < 10:
+        ship_id = f"ship-{next_idx:03d}"
+        next_idx += 1
+        if ship_id in existing_ids:
+            continue
+
+        route_id, origin_port, dest_port, _, _ = routes[(len(rows) - len(templates)) % len(routes)]
+        template = dict(templates[(len(rows) - len(templates)) % len(templates)])
+        eta_hours = round(max(140.0, 360.0 - (len(rows) * 14.5)), 1)
+        total_days = round(float(template.get("voyage_days_total", 18.0)), 1)
+        remaining_days = round(eta_hours / 24.0, 1)
+        progress = min(0.82, 0.18 + (len(rows) * 0.07))
+        lat, lon = interpolate_position(route_id, progress)
+        template.update(
+            {
+                "ship_id": ship_id,
+                "route_id": route_id,
+                "origin_port": origin_port,
+                "dest_port": dest_port,
+                "lat": lat,
+                "lon": lon,
+                "speed_kn": round(16.0 + ((len(rows) % 5) * 0.9), 1),
+                "heading": 240.0 + (len(rows) % 6),
+                "stock_on_hand": 35 + (len(rows) * 7),
+                "eta_hours_estimate": eta_hours,
+                "voyage_days_total": total_days,
+                "voyage_days_remaining": remaining_days,
+                "voyage_days_elapsed": round(total_days - remaining_days, 1),
+                "ship_name": SHIP_NAME_BY_ID.get(ship_id, ship_id),
+            }
+        )
+        rows.append(template)
+        existing_ids.add(ship_id)
+
+    return sorted(rows, key=lambda row: str(row.get("ship_id", "")))
 
 
 def main() -> None:
@@ -84,7 +199,7 @@ def main() -> None:
             .withColumn("voyage_days_elapsed", sql_round(col("voyage_days_total") - col("voyage_days_remaining"), 1))
             .orderBy("ship_id")
         )
-        payload["ships_latest"] = rows_to_dicts(ships_latest)
+        payload["ships_latest"] = ensure_ten_ships(rows_to_dicts(ships_latest))
     except Exception as exc:  # pragma: no cover
         errors.append(f"ships_latest: {exc}")
 

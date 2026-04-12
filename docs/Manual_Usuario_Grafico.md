@@ -16,13 +16,11 @@ La barra lateral izquierda es el punto principal de control.
 
 Incluye:
 
-- estado del stack
-- accesos rápidos
+- identidad corporativa
+- navegación por secciones mediante botones
 - acciones globales
-- navegación por secciones
-- parámetros de demo
-- filtros de cliente y semana industrial
-- incidencias por barco
+- estado del stack y enlaces técnicos
+- documentación enlazada desde el propio sidebar
 
 ## 3. Pantallas principales
 
@@ -31,10 +29,10 @@ Incluye:
 Muestra una vista rápida del sistema:
 
 - flota monitorizada
-- cobertura media de stock
-- ETA de barcos
-- alertas
-- riesgo operativo
+- alertas críticas
+- referencias en riesgo
+- lead time medio
+- resumen ROI de contingencia aérea
 
 ### 3.2 Control Tower Valladolid
 
@@ -44,19 +42,21 @@ Elementos visibles:
 
 - tabla de stock por artículo
 - gráfico de barras del stock por referencia
-- pedidos del cliente seleccionado
+- pedidos del cliente
 - tabla de barcos con ETA
 - Gantt por semanas industriales
 - Gantt de cobertura de stock vs ETA marítima
 - tabla de contingencia aérea
+- seguimiento de 10 barcos con nombres reales
 
 ### 3.3 Arquitectura en vivo
 
 Muestra el estado operativo de servicios Docker:
 
-- botón `On`
-- botón `Off`
+- botones `ON`
+- botones `OFF`
 - estado de cada servicio
+- cabecera técnica con enlaces rápidos a consolas web del stack
 
 ### 3.4 Ingesta
 
@@ -64,22 +64,10 @@ En esta sección se ve:
 
 - tabla de topics Kafka
 - tabla de barcos con ETA y origen/destino
-- mapa GPS de barcos
+- mapa GPS de barcos sobre corredores marítimos
 - alerta visual si un barco deja de cubrir stock
 
 ## 4. Filtros principales
-
-### Cliente destino
-
-Permite cambiar entre:
-
-- `Douai`
-- `Cleon`
-- `Todos`
-
-### Semana industrial
-
-Permite cambiar el horizonte de análisis.
 
 ### Barco concreto
 
@@ -121,7 +109,7 @@ Durante la exposición es recomendable enseñar en este orden:
 Regenerar datos:
 
 ```bash
-docker-compose exec -T spark spark-submit /home/jovyan/jobs/spark/99_dashboard_bundle.py
+docker compose exec -T spark spark-submit /home/jovyan/jobs/spark/99_dashboard_bundle.py
 ```
 
 Y refrescar navegador.
@@ -131,7 +119,7 @@ Y refrescar navegador.
 Recargar dimensiones:
 
 ```bash
-docker-compose exec -T spark spark-submit /home/jovyan/jobs/spark/01_load_master_dimensions.py
+docker compose exec -T spark spark-submit /home/jovyan/jobs/spark/01_load_master_dimensions.py
 ```
 
 ### Servicios caídos
@@ -139,5 +127,14 @@ docker-compose exec -T spark spark-submit /home/jovyan/jobs/spark/01_load_master
 Volver a levantar stack:
 
 ```bash
-docker-compose up -d postgres kafka nifi spark cassandra namenode datanode airflow-webserver
+docker compose up -d postgres kafka nifi spark cassandra namenode datanode airflow-webserver
+```
+
+### No arranca el flujo de NiFi
+
+Si NiFi se levanta desde el dashboard, el flujo Open-Meteo debería arrancar automáticamente. Si no ocurre, verificar:
+
+```bash
+bash scripts/61_nifi_healthcheck.sh
+python3 scripts/62_bootstrap_nifi_open_meteo_flow.py
 ```

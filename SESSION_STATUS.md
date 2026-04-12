@@ -4,7 +4,7 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 
 ## Ultima actualizacion
 - Fecha de referencia: 2026-04-12
-- Contexto: refactor del sidebar Streamlit con navegación por botones y ajuste de la regla económica visible en la portada ejecutiva.
+- Contexto: actualización de manuales, consolidación del sidebar/documentación del dashboard y corrección de posiciones marítimas de la flota en mapas.
 
 ## Resumen ejecutivo
 - El proyecto ya tiene una base funcional de demo: productores Kafka, landing raw en HDFS, jobs Spark batch, tablas Hive, soporte Cassandra, notebooks Zeppelin y un DAG de Airflow.
@@ -55,6 +55,11 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - El sidebar ya no usa `radio`; ahora navega con botones homogéneos apoyados en `st.session_state["vista_actual"]`.
 - Se eliminó del sidebar la sección de parámetros de demo (`Factor de demanda`, `Retraso ETA`, `Semana industrial`, `Cliente destino`) para simplificar la defensa y mantener foco ejecutivo.
 - La regla económica de contingencia aérea quedó explicitada en la portada: activar solo si el ahorro estimado es `>= 24h` y la inversión media `<= 18.000 EUR`.
+- El dashboard ya incorpora sección `Documentación` en sidebar y firma final de autoría.
+- Los manuales del proyecto ya fueron movidos de `DOCUMENTACION/` a `docs/` para unificar toda la documentación en una sola carpeta.
+- La vista de `Arquitectura en vivo` enlaza a consolas web navegables y evita enlaces rotos en servicios sin UI HTTP.
+- Las posiciones GPS visibles de la flota ahora se ajustan a corredores marítimos para evitar barcos sobre tierra.
+- El bundle del dashboard se completa hasta 10 barcos para mantener una demo visual consistente incluso si Hive trae menos registros.
 - Lo mas importante pendiente ahora es cerrar evidencias, Airflow visual, narrativa final de defensa y documentacion completa sobre la ruta Docker/local.
 - Se añadieron nuevas pestañas al dashboard Streamlit:
   - `10. Alertas y Contingencias`: Panel de alertas críticas (fact_alerts), tabla interactiva de decisión (fact_air_recovery_options), scatter plot de IA (coste vs tiempo), mapa de contingencia multimodal con rutas marítimas y desviaciones aéreas.
@@ -102,6 +107,11 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
   2. Navegación agrupada por bloques con botones de ancho uniforme
   3. Acciones globales destacadas
   4. Estado del stack y enlaces técnicos dentro de un expander final
+  5. Sección de documentación y firma de autoría
+- **Mapas marítimos**:
+  1. Productor GPS ajustado a corredores marítimos Asia -> España
+  2. Normalización adicional en dashboard para forzar posiciones sobre agua
+  3. Flota demo ampliada a 10 barcos
 
 ## Estado por fases KDD
 
