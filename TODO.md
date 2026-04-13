@@ -48,16 +48,16 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 
 ### Raw landing y auditoria
 - [x] Ya existe landing raw en HDFS desde Kafka.
-- [ ] Confirmar que las rutas raw finales coinciden con las que se van a enseñar en la entrega.
-- [ ] Incorporar trazabilidad minima: timestamps, origen, tipo de evento, ruta de error si falla la ingesta.
+- [x] Confirmar que las rutas raw finales coinciden con las que se van a enseñar en la entrega.
+- [x] Incorporar trazabilidad minima: timestamps, origen, tipo de evento, ruta de error si falla la ingesta.
 - [ ] Generar capturas o logs de auditoria para demostrar persistencia raw.
 
 ## 3. Fase II - Preprocesamiento y transformacion con Spark
 ### Limpieza y normalizacion
 - [x] `jobs/spark/01_raw_to_staging.py` limpia, tipa y deduplica datos.
-- [ ] Revisar que todos los timestamps queden normalizados de forma consistente para batch y streaming.
-- [ ] Revisar naming y esquema final de staging para que coincidan con la memoria y la defensa.
-- [ ] Añadir una validacion automatica minima del schema de staging y conteos por tabla.
+- [x] Revisar que todos los timestamps queden normalizados de forma consistente para batch y streaming.
+- [x] Revisar naming y esquema final de staging para que coincidan con la memoria y la defensa.
+- [x] Añadir una validacion automatica minima del schema de staging y conteos por tabla.
 
 ### Enriquecimiento con datos maestros en Hive
 - [x] Crear tablas maestras reales en Hive:
@@ -66,7 +66,7 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
   - `dim_warehouse`.
   - `dim_skus` o equivalente.
 - [x] Enriquecer el pipeline Spark cruzando raw/staging con esas dimensiones Hive, no solo con valores simulados embebidos.
-- [ ] Documentar el origen de cada dimension y el criterio de join.
+- [x] Documentar el origen de cada dimension y el criterio de join.
 - [x] Validar que las tablas Hive quedan consultables desde Spark y desde la UI/CLI elegida.
 
 ### Grafos con GraphFrames
