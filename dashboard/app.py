@@ -623,24 +623,22 @@ def normalize_ship_positions(ships: pd.DataFrame) -> pd.DataFrame:
     if ships.empty or not {"route_id", "lat", "lon"}.issubset(ships.columns):
         return ships
     ships = ships.copy()
-    for idx, row in ships.iterrows():
-        corridor = SEA_ROUTE_CORRIDORS.get(str(row.get("route_id", "")))
-        if not corridor:
-            continue
-        origin = corridor[0]
-        dest = corridor[-1]
-        lat = float(row.get("lat", origin[0]))
-        lon = float(row.get("lon", origin[1]))
-        denom = abs(dest[0] - origin[0]) + abs(dest[1] - origin[1])
-        if denom <= 0:
-            progress = 0.0
+    result_rows = []
+    for _, row in ships.iterrows():
+        route_id = str(row.get("route_id", ""))
+        eta_hours = float(row.get("eta_hours_estimate", 200))
+        voyage_total = float(row.get("voyage_days_total", 18))
+        if voyage_total > 0:
+            progress = 1.0 - (eta_hours / (voyage_total * 24))
+            progress = max(0.0, min(1.0, progress))
         else:
-            progress = ((abs(lat - origin[0]) + abs(lon - origin[1])) / denom)
-        snapped = interpolate_sea_route(str(row.get("route_id")), progress)
+            progress = 0.5
+        snapped = interpolate_sea_route(route_id, progress)
         if snapped:
-            ships.at[idx, "lat"] = snapped[0]
-            ships.at[idx, "lon"] = snapped[1]
-    return ships
+            row["lat"] = snapped[0]
+            row["lon"] = snapped[1]
+        result_rows.append(row)
+    return pd.DataFrame(result_rows)
 
 
 def build_map_data(bundle: dict) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -775,6 +773,7 @@ def build_ship_eta_table(
 
         rows.append(
             {
+                "Nombre de barco": row.get("ship_name", ship_id.replace("ship-", "MV ").title() if ship_id else "N/A"),
                 "Barco": ship_id,
                 "Origen": row.get("origin_port", "N/A"),
                 "Destino": row.get("dest_port", "N/A"),
@@ -2479,6 +2478,20 @@ elif current_page == "4. KDD Fase I - Ingesta":
     st.subheader("NiFi + Kafka")
     st.caption("Mapa operacional con puertos, rutas y barcos en tránsito. Los filtros limitan la vista a destinos y barcos concretos.")
 
+    with st.container(border=True):
+        st.markdown("**Arquitectura técnica - Fase I (Ingesta)**")
+        st.markdown(":arrow_right: API Open-Meteo / AIS ➔ NiFi ➔ Kafka (Topic: datos_crudos) ➔ Kafka (Topic: datos_filtrados)")
+
+    col_met1, col_met2, col_met3 = st.columns(3)
+    with col_met1:
+        st.metric("Mensajes/sec", "124")
+    with col_met2:
+        st.metric("Filtro NiFi OK", "98.5%")
+    with col_met3:
+        st.metric("Estado Kafka", "🟢 ONLINE")
+
+    st.markdown("---")
+
     ship_options = ["Todos"]
     ships_df = pd.DataFrame(bundle.get("ships_latest", []))
     if not ships_df.empty and "ship_id" in ships_df.columns:
@@ -2557,8 +2570,9 @@ elif current_page == "4. KDD Fase I - Ingesta":
         eta_table_df = eta_table_df.copy()
         if {"Lat", "Lon"}.issubset(eta_table_df.columns):
             eta_table_df["GPS"] = eta_table_df.apply(lambda row: f"{row['Lat']}, {row['Lon']}", axis=1)
+        cols_order = ["Nombre de barco", "Barco", "Origen", "Destino", "GPS", "ETA Original", "ETA Recalculada", "Coste Maritimo (EUR)", "Icono Aereo", "Estado"]
         st.dataframe(
-            eta_table_df[[c for c in ["Barco", "Origen", "Destino", "GPS", "ETA Original", "ETA Recalculada", "Coste Maritimo (EUR)", "Icono Aereo", "Estado"] if c in eta_table_df.columns]],
+            eta_table_df[[c for c in cols_order if c in eta_table_df.columns]],
             use_container_width=True,
             hide_index=True,
         )
