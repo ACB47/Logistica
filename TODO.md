@@ -82,12 +82,12 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 ### Structured Streaming
 - [x] Existe `jobs/spark/04_streaming_ml_pipeline.py` con `readStream` y `writeStream`.
 - [x] Ajustar las ventanas a `15 minutes`, porque el enunciado lo pide explicitamente y ahora el codigo usa `5 minutes`.
-- [ ] Verificar que el pipeline streaming realmente corre en el entorno final elegido.
+- [x] Verificar que el pipeline streaming realmente corre en el entorno final elegido.
 - [x] Definir si la entrega final usa:
   - streaming real con Structured Streaming, o
   - micro-batch documentado como aproximacion.
 - [x] Decidir defensa por `micro-batch documentado` para reducir riesgo operativo, manteniendo streaming real como evidencia tecnica complementaria.
-- [ ] Si se defiende streaming real, integrar ese job en la operativa principal y no dejarlo solo como codigo aislado.
+- [x] El streaming queda como evidencia tecnica complementaria (no integrado en operativa principal).
 
 ### Persistencia multicapa
 - [x] Hive se usa para staging y facts historicos.
