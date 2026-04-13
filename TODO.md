@@ -39,11 +39,11 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [x] Existe topic `datos_crudos`.
 - [x] Existe topic `alertas_globales`.
 - [x] Crear y usar un topic de `datos_filtrados` o equivalente, porque el enunciado pide separar datos crudos y filtrados.
-- [ ] Definir claramente el contrato de eventos por topic:
+- [x] Definir claramente el contrato de eventos por topic:
   - posiciones GPS.
   - alertas globales.
   - eventos de stock o datos maestros si se incorporan.
-- [ ] Añadir scripts/comandos de verificacion de topics, particiones y retencion.
+- [x] Añadir scripts/comandos de verificacion de topics, particiones y retencion.
 - [x] Probar flujo extremo a extremo NiFi -> Kafka -> consumidor.
 
 ### Raw landing y auditoria
