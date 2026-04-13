@@ -170,7 +170,7 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 
 ## 10. Cierre operativo del proyecto
 - [x] Definir una ruta oficial de ejecucion desde cero.
-- [ ] Probar esa ruta en limpio en la maquina final.
+- [x] Probar esa ruta en limpio en la maquina final.
 - [x] Resolver incoherencias entre Docker, scripts standalone y cluster de 3 VMs dejando Docker/local como ruta oficial.
 - [x] Confirmar que todos los comandos del README funcionan o actualizarlos.
 - [ ] Dejar una checklist de entrega final marcada con fecha.
