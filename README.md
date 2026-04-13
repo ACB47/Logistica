@@ -17,10 +17,11 @@ El proyecto está **completamente dockerizado** para ejecutarse en cualquier ord
 ```
 
 ### Dashboard con datos reales
-- Para ver el dashboard Streamlit con datos completos, usa el stack HDFS:
-  - `docker compose -f docker-compose.hdfs.yml up -d`
-- Si quieres refrescar el bundle del dashboard:
-  - `docker compose -f docker-compose.hdfs.yml exec -T spark spark-submit /home/jovyan/jobs/spark/99_dashboard_bundle.py`
+- Ruta validada para la demo completa:
+  - `docker compose up -d postgres kafka nifi spark cassandra namenode datanode airflow-webserver`
+  - `bash scripts/66_rebuild_hive_demo_tables.sh`
+  - `docker compose exec -T spark spark-submit /home/jovyan/jobs/spark/99_dashboard_bundle.py`
+  - `bash scripts/67_run_dashboard.sh`
 
 ### Servicios disponibles
 | Servicio | URL |
@@ -95,7 +96,6 @@ Diseño y experiencia visual del dashboard:
 - Estilo visual corporativo con `Streamlit` y `Plotly`, orientado a defensa ejecutiva y auditoría técnica.
 - Menú lateral jerárquico con navegación por botones, identidad de marca y accesos técnicos del stack.
 - Portada `Resumen Ejecutivo` con KPIs, donuts operativos, proyección visual y regla económica explícita de contingencia aérea.
-- Vista `Control Tower Valladolid` con enfoque operacional: stock, cobertura, Gantt industrial y flujo de contingencia multimodal.
 - Vista `Control Tower Valladolid` con enfoque operacional: stock, cobertura, Gantt industrial, flujo de contingencia multimodal y envío SMTP de alertas críticas.
 - Vista `Arquitectura en vivo` con enfoque técnico minimalista: estado del pipeline, controles del stack y lista viva de servicios KDD.
 - Pestañas de auditoría KDD, persistencia, orquestación y evidencias diseñadas para mostrar trazabilidad técnica durante la defensa.

@@ -183,7 +183,7 @@ services:
 
   airflow-webserver:
     image: apache/airflow:2.10.5-python3.10
-    user: "${AIRFLOW_UID:-1000}:0"
+    user: "0:0"
     depends_on:
       kafka:
         condition: service_healthy
@@ -209,6 +209,8 @@ services:
       - ./airflow:/opt/airflow
       - ./jobs:/jobs
       - ./ingesta:/ingesta
+      - /usr/bin/docker:/usr/bin/docker
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - logistica-net
     mem_limit: 1g

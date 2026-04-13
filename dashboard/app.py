@@ -2247,14 +2247,6 @@ elif current_page == "2. Control Tower Valladolid":
             st.plotly_chart(gantt_fig, use_container_width=True, key="gantt_industrial")
 
     lower_left, lower_right = st.columns([1.15, 0.85])
-    with lower_left:
-        st.subheader("Gantt de cobertura de stock vs ETA maritima")
-        stock_gantt = build_stock_rupture_gantt(bundle, selected_customer, week_filter)
-        if stock_gantt is None:
-            st.info("Todavia no hay suficiente informacion para calcular ruptura de stock por ETA maritima.")
-        else:
-            st.plotly_chart(stock_gantt, use_container_width=True, key="stock_coverage_gantt")
-
     with lower_right:
         st.subheader("Propuesta de contingencia aerea")
         contingency_df = build_air_contingency_table(bundle, selected_customer, week_filter)

@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+if [[ -f "${REPO_ROOT}/.env" ]]; then
+  set -a
+  source "${REPO_ROOT}/.env"
+  set +a
+fi
+
 NIFI_BASE_URL="${NIFI_BASE_URL:-https://localhost:8443}"
 NIFI_USERNAME="${NIFI_USERNAME:-admin}"
 NIFI_PASSWORD="${NIFI_PASSWORD:-CHANGE_ME_NIFI_PASSWORD}"

@@ -19,7 +19,7 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
   - HDFS `3.4.2+` y uso claro de YARN.
 - [x] Eliminar la dependencia de ZooKeeper en la ruta principal de ejecucion si la entrega final va a defender KRaft.
 - [x] Decidir y documentar una arquitectura final unica: Docker demo, cluster 3 VMs, o ambas.
-- [ ] Validar que el camino principal de ejecucion coincide con lo que se mostrara en la defensa.
+- [x] Validar que el camino principal de ejecucion coincide con lo que se mostrara en la defensa.
 
 ## 2. Fase I - Ingesta y seleccion
 ### Fuentes y NiFi
@@ -107,8 +107,8 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
   - enfoque hibrido.
 - [x] Enfoque final elegido: reglas de negocio + grafo para la defensa; ML queda como evidencia experimental complementaria.
 - [ ] Asegurar que el modelo o scoring final tenga entradas, salida y criterio de evaluacion claros.
-- [ ] Integrar el envio de alertas email con configuracion segura por `.env` o variables de entorno.
-- [ ] Probar y evidenciar al menos una alerta real generada de punta a punta.
+- [x] Integrar el envio de alertas email con configuracion segura por `.env` o variables de entorno.
+- [x] Probar y evidenciar al menos una alerta real generada de punta a punta.
 - [x] Incorporar un caso de uso avanzado de contingencia con recomendacion explicable para acelerar envios sin romper stock.
 
 ## 5. Fase IV - Orquestacion con Airflow
@@ -123,8 +123,8 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
   - scoring.
   - limpieza.
 - [x] Añadir manejo de fallo mas visible: email, log estructurado o callback de error.
-- [ ] Verificar el DAG en la version final de Airflow que se vaya a presentar.
-- [ ] Preparar evidencias: vista Graph, run exitoso y al menos un reintento.
+- [x] Verificar el DAG en la version final de Airflow que se vaya a presentar.
+- [x] Preparar evidencias: vista Graph, run exitoso y al menos un reintento.
 
 ## 6. YARN y ejecucion distribuida
 - [ ] Documentar en la memoria que la entrega final no usa YARN/VMs y justificar la ruta Docker/local elegida.
@@ -138,8 +138,8 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
   - prueba del DAG.
 - [ ] Añadir tests automatizados si da tiempo, al menos para helpers puros de Python.
 - [ ] Crear un guion de demo de extremo a extremo de 5-10 minutos.
-- [ ] Verificar que no quedan credenciales reales hardcodeadas.
-- [ ] Sustituir placeholders SMTP y revisar `.env.example`.
+- [x] Verificar que no quedan credenciales reales hardcodeadas.
+- [x] Sustituir placeholders SMTP y revisar `.env.example`.
 - [x] Estabilizar el rebuild tecnico tras reinicios: metastore Hive persistente + script `scripts/66_rebuild_hive_demo_tables.sh` validado.
 
 ## 8. Documentacion y memoria
@@ -153,7 +153,7 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
   - [x] NiFi canvas.
   - [x] Hive tablas base (`stg_weather_open_meteo`, `dim_ports_routes_weather`, `fact_weather_operational`).
   - [x] Hive alertas (`fact_alerts`).
-  - [ ] Hive contingencia (`fact_air_recovery_options`).
+  - [x] Hive contingencia (`fact_air_recovery_options`).
   - [x] Cassandra consultas.
   - [x] HDFS curated.
   - [x] GraphFrames resultados.
@@ -172,7 +172,7 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [x] Definir una ruta oficial de ejecucion desde cero.
 - [ ] Probar esa ruta en limpio en la maquina final.
 - [x] Resolver incoherencias entre Docker, scripts standalone y cluster de 3 VMs dejando Docker/local como ruta oficial.
-- [ ] Confirmar que todos los comandos del README funcionan o actualizarlos.
+- [x] Confirmar que todos los comandos del README funcionan o actualizarlos.
 - [ ] Dejar una checklist de entrega final marcada con fecha.
 - [ ] Validar visualmente el dashboard final y que la pestaña de stock/Gantt se ve correctamente.
 
