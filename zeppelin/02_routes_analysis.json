@@ -1,18 +1,21 @@
-%spark
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types._
-
-val ships = spark.table("logistica.stg_ships")
-val routeRisk = spark.table("logistica.fact_route_risk")
-
-val summary = ships.groupBy("dest_port")
-  .agg(
-    count("*").alias("total_ships"),
-    avg("speed_kn").alias("avg_speed"),
-    avg("lat").alias("avg_lat"),
-    avg("lon").alias("avg_lon")
-  )
-  .join(routeRisk, ships("dest_port") === routeRisk("via_port"))
-
-summary.createOrReplaceTempView("route_summary")
-spark.sql("SELECT * FROM route_summary").show()
+{
+  "name": "02 Analisis de Rutas",
+  "paragraphs": [
+    {
+      "title": "Barcos por Destino",
+      "text": "%spark\n// Barcos organizados por puerto de destino\nimport org.apache.spark.sql.functions._\n\nval ships = spark.table(\"logistica.stg_ships\")\n\nval byDest = ships.groupBy(\"dest_port\").agg(\n  count(\"*\").alias(\"total_ships\"),\n  avg(\"speed_kn\").alias(\"avg_speed\"),\n  avg(\"lat\").alias(\"avg_lat\"),\n  avg(\"lon\").alias(\"avg_lon\")\n)\nbyDest.show()"
+    },
+    {
+      "title": "Rutas Disponibles",
+      "text": "%spark\n// Dimensión de rutas\nval routes = spark.table(\"logistica.dim_routes\")\nroutes.show(20, false)"
+    },
+    {
+      "title": "Puertos",
+      "text": "%spark\n// Catálogo de puertos\nval ports = spark.table(\"logistica.dim_ports\")\nports.show(20, false)"
+    },
+    {
+      "title": "Tiempos de Transito",
+      "text": "%spark\n// Tiempos de tránsito por ruta\nval routes = spark.table(\"logistica.dim_routes\")\nroutes.select(\"route_id\", \"origin_port\", \"dest_port\", \"transit_hours\", \"transit_days\", \"cost_eur\").show()"
+    }
+  ]
+}

@@ -164,8 +164,8 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 
 ## 9. Zeppelin y visualizacion
 - [x] Existen notebooks Zeppelin en `zeppelin/`.
-- [ ] Revisar que los notebooks abren correctamente y usan datos actuales.
-- [ ] Preparar al menos un notebook de overview ejecutivo y otro tecnico de alertas/rutas.
+- [x] Revisar que los notebooks abren correctamente y usan datos actuales.
+- [x] Preparar al menos un notebook de overview ejecutivo y otro tecnico de alertas/rutas.
 - [ ] Capturar visualizaciones utiles para la memoria.
 
 ## 10. Cierre operativo del proyecto

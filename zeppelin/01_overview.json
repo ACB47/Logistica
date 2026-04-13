@@ -1,6 +1,29 @@
-%spark
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types._
-
-val hiveTables = spark.sql("SHOW TABLES IN logistica")
-hiveTables.show()
+{
+  "name": "01 Overview Ejecutivo",
+  "paragraphs": [
+    {
+      "title": "Resumen del Pipeline",
+      "text": "%spark\n// Resumen de tablas disponibles en el proyecto Logistica\nimport org.apache.spark.sql.functions._\n\nval tables = spark.sql(\"SHOW TABLES IN logistica\")\ntables.show(50, false)"
+    },
+    {
+      "title": "Estadisticas de Ships",
+      "text": "%spark\n// Conteo de posiciones de barcos\nval ships = spark.table(\"logistica.stg_ships\")\nprintln(s\"Total registros ships: ${ships.count()}\")\nships.groupBy(\"dest_port\").count().show()"
+    },
+    {
+      "title": "Alertas Climaticas",
+      "text": "%spark\n// Conteo de alertas climaticas\nval clima = spark.table(\"logistica.stg_alerts_clima\")\nprintln(s\"Total alertas clima: ${clima.count()}\")\nclima.groupBy(\"region\").count().show()"
+    },
+    {
+      "title": "Alertas Noticias",
+      "text": "%spark\n// Conteo de alertas geopoliticas\nval noticias = spark.table(\"logistica.stg_alerts_noticias\")\nprintln(s\"Total alertas noticias: ${noticias.count()}\")\nnoticias.groupBy(\"region\").count().show()"
+    },
+    {
+      "title": "Stock Valladolid",
+      "text": "%spark\n// Articulos en stock\nval stock = spark.table(\"logistica.dim_articles_valladolid\")\nprintln(s\"Total articulos: ${stock.count()}\")\nstock.select(\"article_ref\", \"article_name\", \"total_stock_pieces\", \"safety_stock_min\").show(20, false)"
+    },
+    {
+      "title": "Pedidos Douai",
+      "text": "%spark\n// Pedidos de clientes Francia\nval orders = spark.table(\"logistica.fact_customer_orders_douai\")\nprintln(s\"Total pedidos: ${orders.count()}\")\norders.show(10, false)"
+    }
+  ]
+}

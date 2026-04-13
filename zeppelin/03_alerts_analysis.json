@@ -1,19 +1,21 @@
-%spark
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types._
-
-val alerts = spark.table("logistica.fact_alerts")
-
-val alertSummary = alerts.groupBy("risk_level", "stock_status")
-  .agg(
-    count("*").alias("count"),
-    avg("risk_score").alias("avg_risk_score"),
-    avg("severity").alias("avg_severity")
-  )
-  .orderBy(desc("avg_risk_score"))
-
-alertSummary.show()
-
-val criticalAlerts = alerts.filter(col("severity") >= 4)
-criticalAlerts.createOrReplaceTempView("critical_alerts")
-spark.sql("SELECT * FROM critical_alerts ORDER BY severity DESC").show()
+{
+  "name": "03 Analisis de Alertas",
+  "paragraphs": [
+    {
+      "title": "Resumen de Alertas",
+      "text": "%spark\n// Resumen de alertas por nivel de riesgo y stock\nimport org.apache.spark.sql.functions._\n\nval alerts = spark.table(\"logistica.fact_alerts\")\n\nval summary = alerts.groupBy(\"risk_level\", \"stock_status\").agg(\n  count(\"*\").alias(\"count\"),\n  avg(\"risk_score\").alias(\"avg_risk_score\"),\n  avg(\"severity\").alias(\"avg_severity\")\n)\nsummary.orderBy(desc(\"avg_risk_score\")).show()"
+    },
+    {
+      "title": "Alertas Criticas",
+      "text": "%spark\n// Alertas con severity >= 4\nval alerts = spark.table(\"logistica.fact_alerts\")\nval critical = alerts.filter(col(\"severity\") >= 4)\ncritical.show(20, false)"
+    },
+    {
+      "title": "Opciones de Contingencia",
+      "text": "%spark\n// Opciones de recuperación área\nval contingency = spark.table(\"logistica.fact_air_recovery_options\")\ncontingency.show(20, false)"
+    },
+    {
+      "title": "Por Region",
+      "text": "%spark\n// Distribución de alertas por región\nval alerts = spark.table(\"logistica.fact_alerts\")\nalerts.groupBy(\"region\").count().orderBy(desc(\"count\")).show()"
+    }
+  ]
+}
