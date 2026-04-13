@@ -144,9 +144,9 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 
 ## 8. Documentacion y memoria
 - [x] Ya existe `docs/00_documento_word.md` como base.
-- [ ] Completar la memoria siguiendo el ciclo KDD completo.
-- [ ] Incluir diagrama de arquitectura final.
-- [ ] Incluir justificacion tecnica de cada tecnologia usada.
+- [x] Completar la memoria siguiendo el ciclo KDD completo.
+- [x] Incluir diagrama de arquitectura final.
+- [x] Incluir justificacion tecnica de cada tecnologia usada.
 - [x] Preparar checklist exacto de evidencias y comandos para la memoria/demo.
 - [ ] Incluir capturas obligatorias:
   - [x] Kafka topics.
