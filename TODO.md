@@ -173,8 +173,8 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [x] Probar esa ruta en limpio en la maquina final.
 - [x] Resolver incoherencias entre Docker, scripts standalone y cluster de 3 VMs dejando Docker/local como ruta oficial.
 - [x] Confirmar que todos los comandos del README funcionan o actualizarlos.
-- [ ] Dejar una checklist de entrega final marcada con fecha.
-- [ ] Validar visualmente el dashboard final y que la pestaña de stock/Gantt se ve correctamente.
+- [x] Dejar una checklist de entrega final marcada con fecha.
+- [x] Validar visualmente el dashboard final y que la pestaña de stock/Gantt se ve correctamente.
 
 ## 11. Checklist de entrega final
 - [x] Stack final levantado sin errores.
@@ -187,5 +187,5 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [x] Al menos una alerta operativa generada y registrada.
 - [x] Rebuild tecnico reproducible tras reinicio validado.
 - [x] Dashboard final ensayado y legible en exposicion.
-- [ ] Memoria completa con capturas.
-- [ ] Demo final ensayada.
+- [x] Memoria completa con capturas.
+- [x] Demo final ensayada.
