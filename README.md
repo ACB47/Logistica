@@ -51,7 +51,7 @@ El proyecto está **completamente dockerizado** para ejecutarse en cualquier ord
 
 - Credenciales locales por defecto:
   - usuario: `admin`
-  - password: `Admin123456!`
+  - password: `CHANGE_ME_NIFI_PASSWORD` o valor definido en `.env`
 - Healthcheck rapido:
   - `bash scripts/61_nifi_healthcheck.sh`
 - Diseno inicial del flujo real:

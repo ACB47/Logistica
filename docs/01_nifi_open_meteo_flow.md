@@ -15,7 +15,7 @@ Este documento define el primer flujo real de NiFi para la entrega.
 
 ## Credenciales locales NiFi
 - Usuario: `${NIFI_USERNAME}` o `admin`
-- Password: `${NIFI_PASSWORD}` o `Admin123456!`
+- Password: `${NIFI_PASSWORD}` o `CHANGE_ME_NIFI_PASSWORD`
 
 ## Topics destino
 - Raw: `datos_crudos`

@@ -3,7 +3,7 @@ set -euo pipefail
 
 NIFI_BASE_URL="${NIFI_BASE_URL:-https://localhost:8443}"
 NIFI_USERNAME="${NIFI_USERNAME:-admin}"
-NIFI_PASSWORD="${NIFI_PASSWORD:-Admin123456!}"
+NIFI_PASSWORD="${NIFI_PASSWORD:-CHANGE_ME_NIFI_PASSWORD}"
 
 echo "Comprobando NiFi en ${NIFI_BASE_URL}"
 

@@ -11,7 +11,7 @@ import urllib.request
 
 BASE_URL = os.getenv("NIFI_BASE_URL", "https://localhost:8443/nifi-api")
 USERNAME = os.getenv("NIFI_USERNAME", "admin")
-PASSWORD = os.getenv("NIFI_PASSWORD", "Admin123456!")
+PASSWORD = os.getenv("NIFI_PASSWORD", "CHANGE_ME_NIFI_PASSWORD")
 OPEN_METEO_LATITUDE = os.getenv("OPEN_METEO_LATITUDE", "36.1408")
 OPEN_METEO_LONGITUDE = os.getenv("OPEN_METEO_LONGITUDE", "-5.3536")
 OPEN_METEO_TIMEZONE = os.getenv("OPEN_METEO_TIMEZONE", "Europe/Madrid")

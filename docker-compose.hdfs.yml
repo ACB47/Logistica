@@ -95,7 +95,7 @@ services:
     image: apache/nifi:2.6.0
     environment:
       SINGLE_USER_CREDENTIALS_USERNAME: ${NIFI_USERNAME:-admin}
-      SINGLE_USER_CREDENTIALS_PASSWORD: ${NIFI_PASSWORD:-Admin123456!}
+      SINGLE_USER_CREDENTIALS_PASSWORD: ${NIFI_PASSWORD:-CHANGE_ME_NIFI_PASSWORD}
     ports:
       - "8443:8443"
     networks:

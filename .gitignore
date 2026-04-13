@@ -2,6 +2,7 @@
 .venv-dashboard/
 __pycache__/
 *.pyc
+.env
 
 # Airflow local artifacts
 airflow/airflow.cfg

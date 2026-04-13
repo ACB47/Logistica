@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 
 
-SMTP_HOST = "smtp-mail.outlook.com"
-SMTP_PORT = 587
-SMTP_USER = "logistica-alerts@outlook.com"
-SMTP_PASSWORD = "CHANGE_ME_TO_REAL_PASSWORD"
-ALERT_RECIPIENTS = ["operaciones@empresa.com", "logistica@empresa.com"]
+SMTP_HOST = os.getenv("SMTP_HOST", os.getenv("SMTP_SERVER", "smtp-mail.outlook.com"))
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+ALERT_RECIPIENTS = [
+    email.strip()
+    for email in os.getenv("SMTP_RECIPIENT", "operaciones@empresa.com,logistica@empresa.com").split(",")
+    if email.strip()
+]
 
 
 def send_alert_email(
@@ -20,6 +25,10 @@ def send_alert_email(
 ) -> bool:
     if recipients is None:
         recipients = ALERT_RECIPIENTS
+
+    if not SMTP_USER or not SMTP_PASSWORD:
+        print("[EMAIL] SMTP no configurado en variables de entorno")
+        return False
 
     try:
         msg = MIMEMultipart("alternative")
