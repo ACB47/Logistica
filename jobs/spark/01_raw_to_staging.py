@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import abs as sql_abs
-from pyspark.sql.functions import col, from_json, hash as spark_hash, lit, pmod
+from pyspark.sql.functions import col, from_json, from_utc_timestamp, hash as spark_hash, lit, pmod, to_utc_timestamp
 from pyspark.sql.types import (
     DoubleType,
     IntegerType,
     StringType,
     StructField,
     StructType,
+    TimestampType,
 )
 
 
@@ -80,14 +81,17 @@ def main() -> None:
     ships_clean = (
         ships.dropna(subset=["ship_id", "ts", "lat", "lon"])
         .dropDuplicates(["ship_id", "ts"])
+        .withColumn("ts_utc", to_utc_timestamp(col("ts"), "UTC"))
     )
     clima_clean = (
         clima.dropna(subset=["ts", "region", "text"])
         .dropDuplicates(["ts", "region", "text"])
+        .withColumn("ts_utc", to_utc_timestamp(col("ts"), "UTC"))
     )
     noticias_clean = (
         noticias.dropna(subset=["ts", "region", "text"])
         .dropDuplicates(["ts", "region", "text"])
+        .withColumn("ts_utc", to_utc_timestamp(col("ts"), "UTC"))
     )
 
     # ---------------------------------------------------------
@@ -131,6 +135,13 @@ def main() -> None:
 
     print("OK - tablas staging creadas:")
     spark.sql("SHOW TABLES IN logistica").show(truncate=False)
+
+    tables = ["stg_ships", "stg_alerts_clima", "stg_alerts_noticias"]
+    for tbl in tables:
+        df = spark.table(f"logistica.{tbl}")
+        count = df.count()
+        cols = [f.name for f in df.schema.fields]
+        print(f"[VALIDACION] {tbl}: {count} filas, columnas: {cols}")
 
     spark.stop()
 

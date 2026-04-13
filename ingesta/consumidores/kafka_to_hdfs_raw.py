@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import socket
 import subprocess
 import time
 from dataclasses import dataclass
@@ -14,6 +15,10 @@ from kafka import KafkaConsumer
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def utc_now_iso() -> str:
+    return utc_now().isoformat()
 
 
 def utc_local_stamp(dt: datetime) -> str:
@@ -90,8 +95,12 @@ def main() -> None:
                 continue
             # name puede ser ships/clima/noticias
             hdfs_dir = f"/hadoop/logistica/raw/{name}/{current_minute_hdfs}"
-            hdfs_put(local_path, hdfs_dir)
-            local_path.unlink(missing_ok=True)
+            try:
+                hdfs_put(local_path, hdfs_dir)
+                print(f"[AUDIT] {utc_now_iso()} {name} -> {hdfs_dir}")
+                local_path.unlink(missing_ok=True)
+            except Exception as e:
+                print(f"[ERROR] {utc_now_iso()} Fallo en {name} -> {hdfs_dir}: {e}")
 
     def ensure_files(minute_stamp: str) -> None:
         nonlocal open_files, buffers
@@ -120,6 +129,11 @@ def main() -> None:
             topic = msg.topic
             value = msg.value
 
+            value["_ingestion_ts"] = utc_now_iso()
+            value["_ingestion_host"] = socket.gethostname()
+            value["_ingestion_partition"] = msg.partition
+            value["_ingestion_offset"] = msg.offset
+
             if topic == "datos_crudos":
                 buffers["ships"].append(json.dumps(value, ensure_ascii=False))
             elif topic == "alertas_globales":
@@ -129,7 +143,6 @@ def main() -> None:
                 elif source == "noticias":
                     buffers["noticias"].append(json.dumps(value, ensure_ascii=False))
                 else:
-                    # si no viene source, lo tratamos como noticias por defecto
                     buffers["noticias"].append(json.dumps(value, ensure_ascii=False))
 
             # flush por tamaño para no perder si se para
