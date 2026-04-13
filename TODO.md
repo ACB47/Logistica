@@ -137,7 +137,7 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
   - al menos un `spark-submit` clave.
   - prueba del DAG.
 - [ ] Añadir tests automatizados si da tiempo, al menos para helpers puros de Python.
-- [ ] Crear un guion de demo de extremo a extremo de 5-10 minutos.
+- [x] Crear un guion de demo de extremo a extremo de 5-10 minutos.
 - [x] Verificar que no quedan credenciales reales hardcodeadas.
 - [x] Sustituir placeholders SMTP y revisar `.env.example`.
 - [x] Estabilizar el rebuild tecnico tras reinicios: metastore Hive persistente + script `scripts/66_rebuild_hive_demo_tables.sh` validado.
