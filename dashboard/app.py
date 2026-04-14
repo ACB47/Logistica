@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import subprocess
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -196,6 +197,41 @@ def get_smtp_config() -> dict[str, str | int | bool]:
     }
 
 
+def resolve_smtp_ipv4(host: str, port: int) -> str:
+    try:
+        addrinfo = socket.getaddrinfo(host, port, family=socket.AF_INET, type=socket.SOCK_STREAM)
+    except socket.gaierror as exc:
+        raise ConnectionError(f"No se pudo resolver el host SMTP {host}: {exc}") from exc
+
+    if not addrinfo:
+        raise ConnectionError(f"No se encontro una direccion IPv4 valida para {host}")
+
+    return str(addrinfo[0][4][0])
+
+
+def save_demo_alert_email(
+    recipient_email: str,
+    subject: str,
+    body_html: str,
+    alerts_data: list[dict],
+) -> Path:
+    output_dir = ROOT / "artifacts" / "email_alerts"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_path = output_dir / f"critical_alert_{timestamp}.json"
+    payload = {
+        "mode": "demo",
+        "created_at": datetime.now().isoformat(),
+        "recipient": recipient_email,
+        "subject": subject,
+        "alerts_count": len(alerts_data),
+        "alerts": alerts_data,
+        "body_html": body_html,
+    }
+    output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return output_path
+
+
 def render_card(title: str, value: str, subtitle: str, height: int = 155) -> None:
     components.html(
         f"""
@@ -239,15 +275,19 @@ def send_critical_alerts_email(alerts_data: list[dict], recipient_override: str 
     smtp_password = str(smtp_config["password"])
     recipient_email = recipient_override.strip() if recipient_override else str(smtp_config["recipient"])
     sender_name = str(smtp_config["sender_name"])
+    smtp_timeout = 10
 
     if not smtp_config["configured"] or not recipient_email:
         return False, "Falta configurar SMTP en .env. Revisa SMTP_HOST/SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASSWORD y SMTP_RECIPIENT."
     
     try:
+        smtp_connect_host = resolve_smtp_ipv4(smtp_server, smtp_port)
+        subject = "🚨 ALERTA: Referencias Críticas - Riesgo de Rotura de Stock"
+
         msg = MIMEMultipart()
         msg["From"] = f"{sender_name} <{smtp_user}>"
         msg["To"] = recipient_email
-        msg["Subject"] = "🚨 ALERTA: Referencias Críticas - Riesgo de Rotura de Stock"
+        msg["Subject"] = subject
         
         body = """<!DOCTYPE html>
 <html>
@@ -300,15 +340,32 @@ def send_critical_alerts_email(alerts_data: list[dict], recipient_override: str 
         
         msg.attach(MIMEText(body, "html"))
         
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-        server.login(smtp_user, smtp_password)
-        server.send_message(msg)
-        server.quit()
-        
+        with smtplib.SMTP(timeout=smtp_timeout) as server:
+            server._host = smtp_server
+            server.connect(smtp_connect_host, smtp_port)
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(smtp_user, smtp_password)
+            server.send_message(msg)
+
         return True, f"Correo enviado correctamente a {recipient_email}"
-        
+    except socket.timeout:
+        demo_path = save_demo_alert_email(recipient_email, subject, body, alerts_data)
+        return True, (
+            f"SMTP inaccesible; alerta guardada en modo demo en {demo_path}"
+        )
+    except smtplib.SMTPAuthenticationError:
+        return False, "Autenticacion SMTP fallida. Revisa SMTP_USER y SMTP_PASSWORD."
+    except smtplib.SMTPConnectError as e:
+        demo_path = save_demo_alert_email(recipient_email, subject, body, alerts_data)
+        return True, f"Conexion SMTP no disponible; alerta guardada en modo demo en {demo_path}"
+    except smtplib.SMTPException as e:
+        return False, f"Error SMTP: {e}"
     except Exception as e:
+        if "Network is unreachable" in str(e) or "timed out" in str(e):
+            demo_path = save_demo_alert_email(recipient_email, subject, body, alerts_data)
+            return True, f"Sin salida SMTP; alerta guardada en modo demo en {demo_path}"
         return False, f"Error al enviar correo: {str(e)}"
 
 
@@ -499,6 +556,7 @@ def run_script(script: str) -> str:
 @st.cache_data(ttl=60)
 def get_dashboard_bundle() -> dict:
     output_file = ROOT / "jobs" / "dashboard_bundle_output.json"
+    backup_file = ROOT / "jobs" / "dashboard_bundle_output.last_good.json"
     command = DOCKER_COMPOSE + [
         "exec",
         "-T",
@@ -513,7 +571,19 @@ def get_dashboard_bundle() -> dict:
     if not output_file.exists():
         raise RuntimeError("No se genero el archivo dashboard_bundle_output.json")
 
-    return json.loads(output_file.read_text(encoding="utf-8"))
+    bundle = json.loads(output_file.read_text(encoding="utf-8"))
+    key_sections = ["ships_latest", "stock_valladolid", "customer_orders_douai", "article_gantt"]
+    has_main_data = any(bundle.get(section) for section in key_sections)
+
+    if has_main_data:
+        backup_file.write_text(json.dumps(bundle, ensure_ascii=False), encoding="utf-8")
+        return bundle
+
+    if backup_file.exists():
+        return json.loads(backup_file.read_text(encoding="utf-8"))
+
+    error_text = "; ".join(bundle.get("errors", [])) if isinstance(bundle, dict) else ""
+    raise RuntimeError(error_text or "El bundle del dashboard no contiene datos utilizables")
 
 
 def reset_dashboard_cache() -> None:
@@ -1950,7 +2020,7 @@ elif current_page == "2. Control Tower Valladolid":
                         success, message = send_critical_alerts_email(alerts_for_email, recipient_override=recipient_input)
                         
                         if success:
-                            st.balloons()
+                            st.toast("Alerta procesada", icon="✉️")
                             st.success(f"✉️ {message}")
                         else:
                             st.error(f"⚠️ {message}")
@@ -2227,32 +2297,14 @@ elif current_page == "2. Control Tower Valladolid":
 
     st.markdown("---")
 
-    stock_left, stock_right = st.columns([1.05, 0.95])
-    with stock_left:
-        st.subheader("Pedidos de cliente")
-        orders_view = filter_orders(bundle, selected_customer, week_filter)
-        if orders_view.empty:
-            st.info("No hay pedidos para este cliente/semana en el bundle actual.")
-        else:
-            st.dataframe(orders_view, use_container_width=True, hide_index=True)
-    with stock_right:
-        st.subheader("Flota y ETA")
-        st.dataframe(enrich_ship_eta_dates(pd.DataFrame(bundle.get("ships_latest", []))), use_container_width=True, hide_index=True)
-        st.subheader("Gantt por semanas industriales")
-        gantt_fig = build_gantt(bundle, week_filter)
-        if gantt_fig is None:
-            st.info("Todavia no hay tareas de planificacion para mostrar en el Gantt.")
-        else:
-            st.plotly_chart(gantt_fig, use_container_width=True, key="gantt_industrial")
-
-    lower_left, lower_right = st.columns([1.15, 0.85])
-    with lower_right:
-        st.subheader("Propuesta de contingencia aerea")
-        contingency_df = build_air_contingency_table(bundle, selected_customer, week_filter)
-        if contingency_df.empty:
-            st.info("No hay referencias en rotura de stock con propuesta aerea disponible en este momento.")
-        else:
-            st.dataframe(contingency_df, use_container_width=True, hide_index=True)
+    st.subheader("Flota y ETA")
+    st.dataframe(enrich_ship_eta_dates(pd.DataFrame(bundle.get("ships_latest", []))), use_container_width=True, hide_index=True)
+    st.subheader("Gantt por semanas industriales")
+    gantt_fig = build_gantt(bundle, week_filter)
+    if gantt_fig is None:
+        st.info("Todavia no hay tareas de planificacion para mostrar en el Gantt.")
+    else:
+        st.plotly_chart(gantt_fig, use_container_width=True, key="gantt_industrial")
 
     st.markdown("---")
 
@@ -2317,7 +2369,19 @@ elif current_page == "2. Control Tower Valladolid":
         st.dataframe(orders_display[cols_orders], use_container_width=True, hide_index=True, height=280)
 
         if not orders_display.empty and "Semana" in orders_display.columns:
+            all_impact_weeks = []
+            if not orders_df.empty and "industrial_week" in orders_df.columns:
+                all_impact_weeks = sorted(orders_df["industrial_week"].dropna().astype(str).unique().tolist())[:10]
+
             weekly_demand = orders_display.groupby("Semana")["Piezas"].sum().reset_index()
+            if all_impact_weeks:
+                weekly_demand = pd.DataFrame({"Semana": all_impact_weeks}).merge(
+                    weekly_demand,
+                    on="Semana",
+                    how="left",
+                )
+                weekly_demand["Piezas"] = weekly_demand["Piezas"].fillna(0)
+
             fig_bar = px.bar(
                 weekly_demand,
                 x="Semana",
@@ -2333,59 +2397,10 @@ elif current_page == "2. Control Tower Valladolid":
                 margin=dict(l=10, r=10, t=20, b=10),
                 xaxis_title="Semana Industrial",
                 yaxis_title="Piezas Demandadas",
+                xaxis={"categoryorder": "array", "categoryarray": all_impact_weeks or weekly_demand["Semana"].tolist()},
             )
             fig_bar.update_traces(textposition="outside")
             st.plotly_chart(fig_bar, use_container_width=True)
-
-    st.markdown("##### Gantt de Cobertura - Horizonte 10 Semanas")
-
-    if gantt_df.empty:
-        st.info("No hay datos de planificación disponibles.")
-    else:
-        gantt_work = gantt_df.copy()
-
-        if "start_date" in gantt_work.columns:
-            gantt_work["start_date"] = pd.to_datetime(gantt_work["start_date"], errors="coerce")
-        if "end_date" in gantt_work.columns:
-            gantt_work["end_date"] = pd.to_datetime(gantt_work["end_date"], errors="coerce")
-
-        color_map_gantt = {
-            "sea": "#2563eb",
-            "air": "#dc2626",
-            "truck": "#0891b2",
-        }
-
-        if "transport_mode" in gantt_work.columns:
-            gantt_work["color"] = gantt_work["transport_mode"].map(color_map_gantt)
-        else:
-            gantt_work["color"] = "#2563eb"
-
-        valid_gantt = gantt_work.dropna(subset=["start_date", "end_date"])
-        if valid_gantt.empty:
-            st.warning("No hay fechas válidas para el Gantt.")
-        else:
-            fig_gantt = px.timeline(
-                valid_gantt,
-                x_start="start_date",
-                x_end="end_date",
-                y="article_ref",
-                color="color",
-                hover_data=["industrial_week", "transport_mode"],
-                color_discrete_map=color_map_gantt,
-            )
-            fig_gantt.update_layout(
-                height=320,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(255,255,255,0.6)",
-                font_color="#10233f",
-                margin=dict(l=10, r=10, t=20, b=20),
-                xaxis_title="Calendario (Fechas)",
-                yaxis_title="ID Artículo",
-                showlegend=True,
-                legend_title="Modo Transporte",
-            )
-            fig_gantt.update_yaxes(autorange="reversed")
-            st.plotly_chart(fig_gantt, use_container_width=True)
 
 elif current_page == "3. Arquitectura en vivo":
     hero_left, hero_right = st.columns([1.7, 0.9])

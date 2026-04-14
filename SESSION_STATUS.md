@@ -3,8 +3,8 @@
 Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el repo.
 
 ## Ultima actualizacion
-- Fecha de referencia: 2026-04-12
-- Contexto: configuración SMTP visible en Control Tower, destinatario editable desde la UI y actualización de documentación relacionada.
+- Fecha de referencia: 2026-04-14
+- Contexto: ajustes finales de `Control Tower`, recuperación del bundle del dashboard desde HDFS/Hive real y endurecimiento del fallback local.
 
 ## Resumen ejecutivo
 - El proyecto ya tiene una base funcional de demo: productores Kafka, landing raw en HDFS, jobs Spark batch, tablas Hive, soporte Cassandra, notebooks Zeppelin y un DAG de Airflow.
@@ -62,6 +62,15 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - El bundle del dashboard se completa hasta 10 barcos para mantener una demo visual consistente incluso si Hive trae menos registros.
 - `Control Tower Valladolid` ya muestra el estado SMTP, lee `.env` directamente y permite escribir el destinatario del correo antes de enviar alertas críticas.
 - Los archivos trackeados ya no incluyen el default sensible `Admin123456!`; `.env` quedó ignorado en git para evitar fugas accidentales de credenciales locales.
+- `start.sh` ya ofrece la opción `3) Dashboard solo (ultraligero)`, que arranca Streamlit local sin Docker para evitar bloqueos del equipo durante tareas de rediseño.
+- Regla operativa nueva: no usar `docker-compose.simple.yml` para iterar sobre UI; reservar Docker para demo y regeneración de datos.
+- `Control Tower Valladolid` se simplificó visualmente: se eliminó el primer bloque de pedidos bajo la proyección, la tabla de contingencia aérea intermedia y el último `Gantt de Cobertura - Horizonte 10 Semanas`.
+- El gráfico `Impacto en Cliente - Francia (Douai y Cléon)` ahora fuerza el horizonte completo de 10 semanas industriales, rellenando con `0` las semanas sin pedidos.
+- El envío SMTP de alertas críticas ya no bloquea la UI: usa timeout, fuerza IPv4, muestra mensajes de error claros y cae a modo demo guardando JSON en `artifacts/email_alerts/` cuando la red bloquea SMTP.
+- Se confirmó que en esta red hay salida HTTPS pero no SMTP (`smtp.gmail.com:465/587` timeout), así que el envío real depende de usar otro relay o migrar a API HTTPS.
+- `get_dashboard_bundle()` ahora protege contra bundles corruptos: si una regeneración falla y no trae datos útiles, reutiliza `jobs/dashboard_bundle_output.last_good.json`.
+- Incidencia resuelta: el dashboard quedó vacío porque `dashboard_bundle_output.json` se regeneró con HDFS en `safe mode`; se recuperó levantando `datanode`, reconstruyendo tablas y regenerando el bundle en secuencia.
+- Regla crítica reafirmada: no ejecutar verificaciones `spark-sql` y regeneración del bundle en paralelo; Derby bloquea el metastore embebido.
 - Lo mas importante pendiente ahora es cerrar evidencias, Airflow visual, narrativa final de defensa y documentacion completa sobre la ruta Docker/local.
 - Se añadieron nuevas pestañas al dashboard Streamlit:
   - `10. Alertas y Contingencias`: Panel de alertas críticas (fact_alerts), tabla interactiva de decisión (fact_air_recovery_options), scatter plot de IA (coste vs tiempo), mapa de contingencia multimodal con rutas marítimas y desviaciones aéreas.

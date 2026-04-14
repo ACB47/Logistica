@@ -16,6 +16,10 @@ El proyecto está **completamente dockerizado** para ejecutarse en cualquier ord
 ./start.sh
 ```
 
+- Para rediseñar solo el dashboard y evitar saturar el equipo:
+  - `./start.sh` y elegir `3`
+  - o directamente `bash scripts/67_run_dashboard.sh`
+
 ### Dashboard con datos reales
 - Ruta validada para la demo completa:
   - `docker compose up -d postgres kafka nifi spark cassandra namenode datanode airflow-webserver`
@@ -109,7 +113,12 @@ Operación del dashboard:
 bash scripts/67_run_dashboard.sh
 ```
 
-- Si el dashboard aparece vacío, levantar primero el stack HDFS y regenerar el bundle.
+- Para trabajo de UI no hace falta levantar Docker si ya existe `jobs/dashboard_bundle_output.json`.
+- Si el dashboard aparece vacío, levantar primero `namenode`, `datanode` y `spark`, reconstruir Hive y regenerar el bundle en este orden:
+  - `bash scripts/66_rebuild_hive_demo_tables.sh`
+  - `docker compose exec -T spark spark-submit /home/jovyan/jobs/spark/99_dashboard_bundle.py`
+- Los comandos Spark/Hive deben ejecutarse secuencialmente; evitar lanzar `spark-sql` y `spark-submit` en paralelo porque Derby puede bloquear el metastore.
+- El dashboard guarda un fallback local `jobs/dashboard_bundle_output.last_good.json` para no quedarse sin datos si una regeneración falla.
 - Si el panel de servicios no refleja cambios recientes, refrescar la página o esperar el TTL de caché de 15 segundos.
 - Incluye:
   - estado de servicios `OK/NOK/OFF`
@@ -121,6 +130,7 @@ bash scripts/67_run_dashboard.sh
   - tablas de `fact_alerts`, `fact_weather_operational` y `fact_graph_centrality`
   - portada ejecutiva con regla explícita de contingencia aérea (`>= 24h` ahorro y `<= 18.000 EUR` inversión media)
   - envío de alertas por correo desde `Control Tower` con destinatario editable en la UI
+  - fallback de alertas en modo demo si la red bloquea SMTP saliente
 
 ## Stack tecnológico (rúbrica cumplida)
 

@@ -36,9 +36,23 @@ echo "     - Zeppelin"
 echo "     - Airflow"
 echo "     - NiFi"
 echo ""
-read -p "Opcion [1/2]: " opcion
+echo "  3) Dashboard solo (ultraligero)"
+echo "     - Sin Docker"
+echo "     - Streamlit local usando bundle existente"
+echo "     - Recomendado para rediseño UI sin bloquear el equipo"
+echo ""
+read -p "Opcion [1/2/3]: " opcion
 
 case $opcion in
+    3)
+        echo ""
+        echo "Iniciando modo DASHBOARD SOLO..."
+        echo "No se levantan contenedores Docker."
+        echo "Se usará el bundle local del dashboard si ya existe."
+        echo ""
+        bash scripts/67_run_dashboard.sh
+        exit 0
+        ;;
     2)
         echo ""
         echo "Iniciando modo SIMPLE..."
