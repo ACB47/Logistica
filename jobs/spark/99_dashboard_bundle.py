@@ -66,6 +66,10 @@ def rows_to_dicts(dataframe, limit: int | None = None) -> list[dict]:
 
 
 def ensure_ten_ships(rows: list[dict]) -> list[dict]:
+    for row in rows:
+        ship_id = str(row.get("ship_id", ""))
+        row["ship_name"] = SHIP_NAME_BY_ID.get(ship_id, ship_id or "N/A")
+
     if len(rows) >= 10:
         return rows
 

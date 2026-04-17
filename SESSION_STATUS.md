@@ -5,6 +5,11 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 ## Ultima actualizacion
 - Fecha de referencia: 2026-04-14
 - Contexto: ajustes finales de `Control Tower`, recuperación del bundle del dashboard desde HDFS/Hive real y endurecimiento del fallback local.
+- Documento `docs/00_documento_word.md` actualizado para reflejar la ruta Docker/local, el modo `dashboard solo`, el fallback del bundle y el comportamiento demo de alertas SMTP.
+- Segunda pasada documental aplicada en `docs/00_documento_word.md`: redacción más formal y académica en contexto, arquitectura, minería/acción, dashboard y conclusiones.
+- Tercera pasada documental aplicada en `docs/00_documento_word.md`: cierre de apartados que seguían en modo borrador (`NiFi`, evidencias y checklist), actualización de comandos a `docker compose` y eliminación de marcadores `a completar`.
+- `docs/00_documento_word.md` ya incluye una lista explícita de capturas pendientes para cerrar la memoria final.
+- Revisada la carpeta `Capturas de pantalla/`: se confirmó buena cobertura de NiFi, Kafka `datos_filtrados`, Hive curated, Cassandra, Airflow graph y HDFS curated; siguen pendientes arquitectura final, Kafka `datos_crudos`, HDFS raw, flujo end-to-end en terminales, `spark-submit`, `SHOW TABLES`, Airflow run exitoso y capturas del dashboard actual.
 
 ## Resumen ejecutivo
 - El proyecto ya tiene una base funcional de demo: productores Kafka, landing raw en HDFS, jobs Spark batch, tablas Hive, soporte Cassandra, notebooks Zeppelin y un DAG de Airflow.
