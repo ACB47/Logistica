@@ -521,16 +521,12 @@ Capturas ya realizadas e incorporables a la memoria:
 - Dashboard: recuperación del bundle tras incidencia de HDFS `safe mode`
 
 Capturas pendientes para cerrar la memoria:
-- diagrama general de arquitectura final integrando NiFi, Kafka, HDFS, Spark, Hive, Cassandra, Airflow y Dashboard
-- creación y descripción de topics Kafka mostrando `datos_crudos` y `datos_filtrados`
-- aterrizaje raw en HDFS con evidencia de directorios `ships`, `clima` y `noticias`
-- tres terminales de la ejecución end-to-end de ingesta: productor GPS, productor de alertas y consumidor Kafka->HDFS
-- ejecución visible de un `spark-submit` de staging
-- tabla de staging asociada al job ejecutado si se quiere reforzar la parte de transformación inicial
-- listado de tablas `SHOW TABLES IN logistica` tras rebuild o validación final
-- captura adicional de HDFS raw o staging si se quiere mostrar trazabilidad completa desde raw hasta curated
-- run exitoso de Airflow en vista `Graph`
 - reintento de Airflow, si resulta viable y aporta valor a la defensa
+
+Estado real al cierre de esta revisión:
+- La memoria ya cuenta con evidencia de arquitectura, Kafka `datos_crudos` y `datos_filtrados`, HDFS raw y curated, `spark-submit`, `SHOW TABLES IN logistica`, Airflow con run exitoso, capturas del dashboard actual y la captura conjunta de las tres terminales del flujo end-to-end.
+- No quedan pendientes reales de capturas obligatorias para la memoria.
+- El reintento de Airflow permanece como evidencia opcional.
 
 Tabla de cobertura real de capturas disponibles:
 
@@ -557,17 +553,17 @@ Tabla de cobertura real de capturas disponibles:
 | Hive `fact_air_recovery_options` | Cubierto | `Capturas de pantalla/20_evidencia de fact_air_recovery_option.png` |
 | Evidencia de envío mail | Cubierto | `Capturas de pantalla/21_prueba envio mail.png` |
 | Arranque de servicios base | Cubierto | `Capturas de pantalla/1levanta_kafka_airflow_nifi_postgres .png` |
-| Diagrama general de arquitectura final | Pendiente | No localizado |
-| Kafka `datos_crudos` con evidencia visual | Pendiente | No localizado |
-| HDFS raw (`ships`, `clima`, `noticias`) | Pendiente | No localizado |
-| Tres terminales del flujo end-to-end | Pendiente | No localizado |
-| `spark-submit` visible en ejecución | Pendiente | No localizado |
-| `SHOW TABLES IN logistica` | Pendiente | No localizado |
-| Airflow run exitoso | Pendiente | No localizado |
+| Diagrama general de arquitectura final | Cubierto | `Capturas de pantalla/Diagrama General de Arquitectura.png` |
+| Kafka `datos_crudos` con evidencia visual | Cubierto | `Capturas de pantalla/23_KafkaDatosCrudos.png` o `Capturas de pantalla/23B_KafkaDatosCrudos.png` |
+| HDFS raw (`ships`, `clima`, `noticias`) | Cubierto | `Capturas de pantalla/24_hdfs_raw.png` |
+| Tres terminales del flujo end-to-end | Cubierto | `Capturas de pantalla/29_tres_terminales_end_to_end.png` |
+| `spark-submit` visible en ejecución | Cubierto | `Capturas de pantalla/26_spark_submit_staging.png.png` |
+| `SHOW TABLES IN logistica` | Cubierto | `Capturas de pantalla/27_show_tables_logistica.png.png` |
+| Airflow run exitoso | Cubierto | `Capturas de pantalla/28_airflow_run_exitoso.png` |
 | Airflow reintento | Pendiente opcional | No localizado |
-| Dashboard actual `Control Tower Valladolid` | Pendiente recomendable | No localizado |
-| Dashboard actual tabla ETA con nombres reales | Pendiente recomendable | No localizado |
-| Dashboard actual vista de ingesta con barcos sobre mar | Pendiente recomendable | No localizado |
+| Dashboard actual `Control Tower Valladolid` | Cubierto | `Capturas de pantalla/30_dashboard_control_tower.png` |
+| Dashboard actual tabla ETA con nombres reales | Cubierto | `Capturas de pantalla/31_dashboard_eta_barcos.png.png` |
+| Dashboard actual vista de ingesta con barcos sobre mar | Cubierto | `Capturas de pantalla/31_dashboard_eta_barcos.png.png` |
 
 **Kafka**
 

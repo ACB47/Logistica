@@ -10,6 +10,8 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - Tercera pasada documental aplicada en `docs/00_documento_word.md`: cierre de apartados que seguían en modo borrador (`NiFi`, evidencias y checklist), actualización de comandos a `docker compose` y eliminación de marcadores `a completar`.
 - `docs/00_documento_word.md` ya incluye una lista explícita de capturas pendientes para cerrar la memoria final.
 - Revisada la carpeta `Capturas de pantalla/`: se confirmó buena cobertura de NiFi, Kafka `datos_filtrados`, Hive curated, Cassandra, Airflow graph y HDFS curated; siguen pendientes arquitectura final, Kafka `datos_crudos`, HDFS raw, flujo end-to-end en terminales, `spark-submit`, `SHOW TABLES`, Airflow run exitoso y capturas del dashboard actual.
+- Segunda revisión de `Capturas de pantalla/` completada: ya constan capturas de arquitectura, Kafka `datos_crudos`, HDFS raw, `spark-submit`, `SHOW TABLES`, Airflow run exitoso y dashboard actual. Solo queda pendiente real la captura de las tres terminales del flujo end-to-end; el retry de Airflow sigue siendo opcional.
+- Tercera revisión de capturas completada: `Capturas de pantalla/29_tres_terminales_end_to_end.png` ya cubre el flujo end-to-end en tres terminales. No quedan pendientes reales de capturas obligatorias; el retry de Airflow sigue siendo opcional.
 
 ## Resumen ejecutivo
 - El proyecto ya tiene una base funcional de demo: productores Kafka, landing raw en HDFS, jobs Spark batch, tablas Hive, soporte Cassandra, notebooks Zeppelin y un DAG de Airflow.
