@@ -77,7 +77,7 @@ Las principales decisiones tecnológicas se justifican del siguiente modo:
 - `Cassandra` cubre el requisito de consulta rápida sobre el último estado operativo.
 - `Airflow` aporta orquestación, dependencias, reintentos y trazabilidad de ejecución.
 
-**Captura a incluir**: diagrama de arquitectura general del proyecto, integrando NiFi, Kafka, HDFS, Spark, Hive, Cassandra, Airflow y Dashboard.
+**Figura recomendada**: diagrama de arquitectura general del proyecto, integrando NiFi, Kafka, HDFS, Spark, Hive, Cassandra, Airflow y Dashboard.
 
 ---
 
@@ -154,15 +154,15 @@ Asimismo, si HDFS entra en `safe mode` o la regeneración del bundle falla, el d
 
 - Flujo exportado reutilizable:
   - `docs/nifi/OpenMeteo_Kafka_Flow.json`
-- En la memoria, este artefacto debe utilizarse para:
+- En la memoria, este artefacto se utiliza para:
   - referenciar el JSON como evidencia técnica del canvas real
   - acompañarlo de una captura PNG del flujo en ejecución
   - justificar que el export permite reimportar, auditar y reproducir la ingesta
 
 **Capturas**:
 - Canvas completo de NiFi.
-- Configuracion de `InvokeHTTP`.
-- Configuracion de `PublishKafka`.
+- Configuración de `InvokeHTTP`.
+- Configuración de `PublishKafka`.
 
 ### 4.2 Formato de eventos (contratos)
 
@@ -261,7 +261,7 @@ hdfs dfs -ls -R /hadoop/logistica/raw/noticias | head
 **Ejecución del job 01 (ejemplo local/docker)**:
 
 ```bash
-docker-compose exec -T spark spark-submit /home/jovyan/jobs/spark/01_raw_to_staging.py
+docker compose exec -T spark spark-submit /home/jovyan/jobs/spark/01_raw_to_staging.py
 ```
 
 **Ejecución del job meteorológico validado en Docker**:
@@ -273,7 +273,7 @@ bash scripts/63_run_weather_filtered_staging.sh full
 Comando directo equivalente:
 
 ```bash
-docker-compose exec -T spark spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 /home/jovyan/jobs/spark/01_weather_filtered_to_staging.py --bootstrap kafka:9092 --topic datos_filtrados
+docker compose exec -T spark spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 /home/jovyan/jobs/spark/01_weather_filtered_to_staging.py --bootstrap kafka:9092 --topic datos_filtrados
 ```
 
 **Verificación en HDFS (evidencia)**:
@@ -454,7 +454,7 @@ La memoria debe describir NiFi como la capa de adquisición y preparación inici
 
 Este diseño permite justificar tanto la trazabilidad de la ingesta como la separación entre dato bruto y dato preparado.
 
-**Capturas a incluir**:
+**Capturas asociadas**:
 - canvas completo de NiFi con los procesadores conectados
 - configuración de `InvokeHTTP`
 - configuración de `PublishKafkaRecord_2_0` o del procesador equivalente utilizado
@@ -462,7 +462,7 @@ Este diseño permite justificar tanto la trazabilidad de la ingesta como la sepa
 
 ---
 
-## 9. Evidencias y capturas (checklist)
+## 9. Evidencias y capturas
 
 ### 9.0 Dashboard de exposición
 
@@ -484,7 +484,7 @@ Nota técnica:
 - para evitar bloqueos del metastore Derby, las consultas Hive en `spark-sql` y los `spark-submit` con soporte Hive deben ejecutarse de forma secuencial, no en paralelo.
 - en esta red se confirmó salida HTTPS pero no SMTP, por lo que el envío real de correo puede fallar por timeout aunque la aplicación siga operativa gracias al fallback demo.
 
-Ejecucion:
+Ejecución:
 
 ```bash
 bash scripts/67_run_dashboard.sh
@@ -520,13 +520,13 @@ Capturas ya realizadas e incorporables a la memoria:
 - Dashboard: tabla de ETA con `Nombre de barco` y nombres reales de la flota demo
 - Dashboard: recuperación del bundle tras incidencia de HDFS `safe mode`
 
-Capturas pendientes para cerrar la memoria:
-- reintento de Airflow, si resulta viable y aporta valor a la defensa
+Evidencias opcionales de refuerzo:
+- reintento o reejecución controlada de Airflow, si aporta valor adicional a la defensa
 
 Estado real al cierre de esta revisión:
 - La memoria ya cuenta con evidencia de arquitectura, Kafka `datos_crudos` y `datos_filtrados`, HDFS raw y curated, `spark-submit`, `SHOW TABLES IN logistica`, Airflow con run exitoso, capturas del dashboard actual y la captura conjunta de las tres terminales del flujo end-to-end.
 - No quedan pendientes reales de capturas obligatorias para la memoria.
-- El reintento de Airflow permanece como evidencia opcional.
+- El reintento de Airflow permanece como evidencia opcional de refuerzo.
 
 Tabla de cobertura real de capturas disponibles:
 
@@ -560,7 +560,7 @@ Tabla de cobertura real de capturas disponibles:
 | `spark-submit` visible en ejecución | Cubierto | `Capturas de pantalla/26_spark_submit_staging.png.png` |
 | `SHOW TABLES IN logistica` | Cubierto | `Capturas de pantalla/27_show_tables_logistica.png.png` |
 | Airflow run exitoso | Cubierto | `Capturas de pantalla/28_airflow_run_exitoso.png` |
-| Airflow reintento | Pendiente opcional | No localizado |
+| Airflow reintento o reejecución controlada | Opcional | No obligatorio para la entrega |
 | Dashboard actual `Control Tower Valladolid` | Cubierto | `Capturas de pantalla/30_dashboard_control_tower.png` |
 | Dashboard actual tabla ETA con nombres reales | Cubierto | `Capturas de pantalla/31_dashboard_eta_barcos.png.png` |
 | Dashboard actual vista de ingesta con barcos sobre mar | Cubierto | `Capturas de pantalla/31_dashboard_eta_barcos.png.png` |
