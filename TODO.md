@@ -8,7 +8,7 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [x] Hay jobs Spark para staging, analitica de grafos y scoring de alertas.
 - [x] Hay un DAG de Airflow funcional para micro-lotes.
 - [x] Hay utilidades de verificacion y algo de documentacion base.
-- [ ] El proyecto todavia no cumple completamente el enunciado 2025-2026 tal como esta pedido.
+- [x] El proyecto queda suficientemente alineado con el enunciado 2025-2026 para la entrega final defendida en ruta Docker/local.
 
 ## 1. Alinear versiones y arquitectura con la rubrica
 - [x] Actualizar `docker-compose.yml` y `docker-compose.simple.yml` para acercarlos al stack exigido:
@@ -50,7 +50,7 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [x] Ya existe landing raw en HDFS desde Kafka.
 - [x] Confirmar que las rutas raw finales coinciden con las que se van a enseñar en la entrega.
 - [x] Incorporar trazabilidad minima: timestamps, origen, tipo de evento, ruta de error si falla la ingesta.
-- [ ] Generar capturas o logs de auditoria para demostrar persistencia raw.
+- [x] Generar capturas o logs de auditoria para demostrar persistencia raw.
 
 ## 3. Fase II - Preprocesamiento y transformacion con Spark
 ### Limpieza y normalizacion
@@ -106,7 +106,7 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
   - ML + grafo.
   - enfoque hibrido.
 - [x] Enfoque final elegido: reglas de negocio + grafo para la defensa; ML queda como evidencia experimental complementaria.
-- [ ] Asegurar que el modelo o scoring final tenga entradas, salida y criterio de evaluacion claros.
+- [x] Asegurar que el modelo o scoring final tenga entradas, salida y criterio de evaluacion claros.
 - [x] Integrar el envio de alertas email con configuracion segura por `.env` o variables de entorno.
 - [x] Probar y evidenciar al menos una alerta real generada de punta a punta.
 - [x] Incorporar un caso de uso avanzado de contingencia con recomendacion explicable para acelerar envios sin romper stock.
@@ -127,7 +127,7 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [x] Preparar evidencias: vista Graph, run exitoso y al menos un reintento.
 
 ## 6. YARN y ejecucion distribuida
-- [ ] Documentar en la memoria que la entrega final no usa YARN/VMs y justificar la ruta Docker/local elegida.
+- [x] Documentar en la memoria que la entrega final no usa YARN/VMs y justificar la ruta Docker/local elegida.
 
 ## 7. Calidad, pruebas y validacion final
 - [x] Crear un bloque minimo de validaciones reproducibles:
@@ -148,7 +148,7 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
 - [x] Incluir diagrama de arquitectura final.
 - [x] Incluir justificacion tecnica de cada tecnologia usada.
 - [x] Preparar checklist exacto de evidencias y comandos para la memoria/demo.
-- [ ] Incluir capturas obligatorias:
+- [x] Incluir capturas obligatorias:
   - [x] Kafka topics.
   - [x] NiFi canvas.
   - [x] Hive tablas base (`stg_weather_open_meteo`, `dim_ports_routes_weather`, `fact_weather_operational`).
@@ -159,14 +159,14 @@ Checklist para cerrar el proyecto integral de Big Data segun el enunciado de `Pr
   - [x] GraphFrames resultados.
   - [x] Airflow DAG.
   - [x] Dashboard final con stock Valladolid, pedidos Douai y Gantt.
-- [ ] Explicar claramente que parte esta implementada de verdad y que parte es simulada.
-- [ ] Redactar conclusiones, limitaciones y mejoras futuras.
+- [x] Explicar claramente que parte esta implementada de verdad y que parte es simulada.
+- [x] Redactar conclusiones, limitaciones y mejoras futuras.
 
 ## 9. Zeppelin y visualizacion
 - [x] Existen notebooks Zeppelin en `zeppelin/`.
 - [x] Revisar que los notebooks abren correctamente y usan datos actuales.
 - [x] Preparar al menos un notebook de overview ejecutivo y otro tecnico de alertas/rutas.
-- [ ] Capturar visualizaciones utiles para la memoria.
+- [x] Capturar visualizaciones utiles para la memoria.
 
 ## 10. Cierre operativo del proyecto
 - [x] Definir una ruta oficial de ejecucion desde cero.
