@@ -3,9 +3,10 @@
 Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el repo.
 
 ## Ultima actualizacion
-- Fecha de referencia: 2026-04-20
+- Fecha de referencia: 2026-04-21
 - Estado general: documentacion final cerrada, capturas completas, dashboard y memoria alineados con la ruta Docker/local.
 - Sincronizacion documental mas reciente: `docs/00_documento_word.docx` pasa a ser la fuente de verdad y se han alineado `docs/00_documento_word.md` y `docs/00_documento_word.odt` con los ultimos cambios de contenido.
+- Ajuste funcional reciente en `dashboard/app.py`: recuperadas las vistas de `Control Tower` y `Alertas y Contingencias` cuando `fact_air_recovery_options` llega vacia, mediante fallback demo derivado de `ships_latest` y protecciones frente a columnas ausentes.
 
 ## Resumen ejecutivo
 - El proyecto queda defendible de extremo a extremo sobre una arquitectura Docker/local con NiFi, Kafka, HDFS, Spark, Hive, GraphFrames, Cassandra, Airflow y Streamlit.
@@ -51,6 +52,8 @@ Estado rapido del proyecto para poder retomar la sesion sin reanalizar todo el r
 - El bundle del dashboard esta endurecido con fallback a `jobs/dashboard_bundle_output.last_good.json`.
 - El job `jobs/spark/99_dashboard_bundle.py` ya asigna `ship_name` a todos los barcos del bundle.
 - `start.sh` ofrece opcion `3) Dashboard solo (ultraligero)`.
+- El sidebar incluye enlace tecnico a Zeppelin en `http://localhost:8081`.
+- `Alertas y Contingencias` y la proyeccion de stock siguen mostrando datos aunque falte `fact_air_recovery_options` en el bundle.
 
 ## Documentacion final
 - La memoria PDF final a revisar/entregar es `docs/2026_PredictiveLogistics.pdf`.

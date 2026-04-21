@@ -140,7 +140,7 @@ bash scripts/67_run_dashboard.sh
 | Spark Structured Streaming | Procesamiento streaming con ventanas de 15 min |
 | Cassandra | Persistencia NoSQL para métricas |
 | Hive | Tablas SQL (raw/staging/curated) |
-| Zeppelin | Notebooks de visualización |
+| Zeppelin | Notebooks técnicos de exploración |
 | MLlib | 3 algoritmos: LinearRegression, RandomForest, K-Means |
 | Email Alerts | SMTP configurado para alertas operativas |
 | NiFi | Flujo de ingestión de datos |
@@ -239,7 +239,9 @@ Logistica/
 3. **ML**: Modelos de predicción (LinearRegression, RandomForest, K-Means)
 4. **Persistencia**: Cassandra + Hive
 5. **Alertas**: Email automático según severidad
-6. **Visualización**: Zeppelin notebooks
+6. **Visualización técnica**: notebooks Zeppelin como apoyo analítico opcional
+
+La visualización principal de la defensa funcional se realiza en `Streamlit`. `Zeppelin` se conserva como herramienta técnica complementaria para exploración, validación rápida y análisis interactivo sobre Spark/Hive.
 
 ## Caso de uso
 
