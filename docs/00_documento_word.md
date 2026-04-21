@@ -71,10 +71,10 @@ El objetivo del sistema es monitorizar la situación logística de la cadena de 
 Las principales decisiones tecnológicas se justifican del siguiente modo:
 - `Kafka` desacopla las fuentes de datos y los consumidores analíticos.
 - `HDFS` proporciona persistencia raw auditable y una base escalable para staging y curated.
-- `Spark` resuelve la limpieza, tipado, enriquecimiento y construcción de facts analíticas.
+- `Spark` resuelve la limpieza, tipado, enriquecimiento y construcción de facts analíticas. Para maximizar el rendimiento, se ha implementado una estrategia de `Broadcast Hash Joins`. Esta técnica resulta adecuada para esta arquitectura porque tablas de dimensiones como `dim_ports` y `dim_warehouse` son de tamaño reducido. Al marcarlas para broadcast, Spark las distribuye en memoria a cada ejecutor antes de iniciar la transformación, permitiendo que el join con el flujo masivo de datos de barcos se resuelva localmente en cada nodo y eliminando el `shuffle`. El resultado es una reducción clara de latencia y una ejecución más estable en el entorno basado en contenedores.
 - `Hive` actúa como capa SQL histórica y defendible para consulta de resultados.
 - `GraphFrames` permite modelar la red logística como grafo y calcular criticidad estructural.
-- `Cassandra` cubre el requisito de consulta rápida sobre el último estado operativo.
+- `Cassandra` actúa como la capa de servicio de baja latencia para el dashboard, cubriendo el requisito de consulta rápida sobre el último estado operativo de la flota en contraposición a las consultas analíticas pesadas de Hive.
 - `Airflow` aporta orquestación, dependencias, reintentos y trazabilidad de ejecución.
 
 **Figura recomendada**: diagrama de arquitectura general del proyecto, integrando NiFi, Kafka, HDFS, Spark, Hive, Cassandra, Airflow y Dashboard.
@@ -85,12 +85,13 @@ Las principales decisiones tecnológicas se justifican del siguiente modo:
 
 ### 2.1 Arquitectura (Lambda/Kappa adaptada)
 
-La defensa se apoya en una ruta Docker/local reproducible. La estrategia principal es **micro-batch documentado**, dejando `Structured Streaming` como evidencia técnica complementaria ya alineada a ventanas de `15 minutes`.
+La defensa se apoya en una ruta Docker/local reproducible. La estrategia principal es **micro-batch documentado**. Como evidencia técnica complementaria, se ha implementado el job `04_streaming_ml_pipeline.py` utilizando `Structured Streaming`.
+
+Este componente permite procesar eventos mediante ventanas temporales de `15 minutes`, calculando medias móviles de retrasos y estados operativos. Aunque la defensa se centra en el modelo micro-batch para asegurar estabilidad durante la demo, esta implementación demuestra que el sistema puede operar también bajo una arquitectura Kappa más pura.
 
 **Solución final defendida**:
 - Ingesta real con NiFi hacia Kafka (`datos_crudos`, `datos_filtrados`, `alertas_globales`).
 - Persistencia **raw/staging/curated** en HDFS y Hive.
-- Procesamiento Spark secuencial para evitar bloqueos del metastore Derby.
 - Persistencia operativa adicional en Cassandra.
 - Exposición ejecutiva y técnica mediante dashboard Streamlit.
 
@@ -105,10 +106,8 @@ La solución final se articula sobre los siguientes componentes:
 - `airflow-webserver`: supervisión y orquestación de workflows
 - `dashboard` local en `Streamlit`: visualización ejecutiva y técnica para la defensa
 
-**Capturas**:
-- `docker compose ps`
-- UI de HDFS, NiFi, Spark y Airflow
-- Dashboard Streamlit con datos reales
+Figura asociada en el documento final:
+- `Figura 2. Estado de los servicios principales de la plataforma en el entorno Docker/local.`
 
 ---
 
@@ -130,6 +129,9 @@ Cuando se requiere regenerar el dashboard con datos reales, la secuencia validad
 - Menú de `start.sh`
 - `docker compose ps`
 - UI HDFS NameNode
+
+Figura asociada en el documento final:
+- `Figura 3. Servicios principales levantados en la ruta Docker/local para la validación integral del entorno.`
 
 ### 3.2 Regla crítica de operación
 
@@ -309,6 +311,8 @@ Tablas maestras (ejemplos):
 - **Nodos**: puertos, almacén Valladolid, nodos logísticos intermedios (si aplica).
 - **Aristas**: rutas con pesos (tiempo estimado, riesgo).
 
+El grafo logístico actual se construye sobre **6 nodos** y **9 aristas**. Los nodos representan los puertos de origen, los puertos de entrada en España y el almacén final de Valladolid, mientras que las aristas modelan los corredores marítimos principales y el tramo final de distribución terrestre.
+
 ### 6.2 Métricas
 
 - Camino más corto/rápido (peso = tiempo).
@@ -411,6 +415,14 @@ La demo visual incorpora además barcos con salida desde dos puertos asiáticos:
 - Shanghai
 - Yokohama
 
+### 7.4 Modelos de IA complementarios
+
+Como extensión de la fase de minería del proceso KDD, el proyecto incorpora una capa complementaria de analítica predictiva basada en `Spark MLlib`. Esta parte no constituye el eje principal de la defensa funcional, pero sí refuerza la capacidad del sistema para evolucionar desde una plataforma de integración y analítica operativa hacia un entorno con soporte a la predicción y a la segmentación inteligente.
+
+En concreto, se han trabajado tres modelos. El primero es `K-Means`, utilizado para agrupar puertos según patrones de congestión y riesgo climático, facilitando una segmentación operativa de nodos logísticos. El segundo es `Random Forest Classifier`, empleado para clasificar escenarios de riesgo logístico y anticipar situaciones de criticidad, especialmente aquellas relacionadas con posibles roturas de stock o necesidad de contingencia. El tercero es `Linear Regression`, orientado a estimar o reajustar el `ETA` de llegada de los barcos a partir de variables temporales, meteorológicas y operativas.
+
+Esta capa de modelos se presenta en la memoria como una ampliación analítica del bloque de minería, alineada con el uso de `Structured Streaming` y con la capacidad del proyecto para incorporar lógica predictiva sobre los datos ya integrados en la plataforma.
+
 ---
 
 ## 8. Orquestación (KDD – Interpretación/Acción): Airflow
@@ -442,9 +454,13 @@ Requisitos rúbrica:
 - Segundo DAG validado: `logistica_kdd_monthly_retrain`
 - Regla operativa: la evidencia visual de Airflow se toma sobre la ruta Docker/local, no sobre VMs.
 
-### 8.3 NiFi en la memoria
+Como evidencia operativa adicional, se realizó una **reejecución controlada** de una tarea desde la vista `Graph` de Airflow. En lugar de provocar un fallo artificial, se utilizó la funcionalidad `Clear` sobre una tarea previamente completada, forzando su nueva planificación y ejecución. Esta operación demuestra que el pipeline admite relanzamientos parciales de forma segura, trazable y sin necesidad de modificar la definición del DAG.
 
-La memoria debe describir NiFi como la capa de adquisición y preparación inicial del dato. El flujo validado se estructura del siguiente modo:
+Esta evidencia complementa la ejecución exitosa del DAG y refuerza la capacidad operativa del sistema para repetir fases concretas del flujo cuando resulta necesario refrescar datos o rehacer una etapa intermedia.
+
+### 8.3 NiFi
+
+NiFi actúa como la capa de adquisición y preparación inicial del dato. El flujo validado se estructura del siguiente modo:
 
 - consumo de una API HTTP pública mediante `InvokeHTTP`
 - transformación y normalización del payload mediante procesadores de tipo `JoltTransformJSON` o `UpdateRecord`
@@ -452,13 +468,11 @@ La memoria debe describir NiFi como la capa de adquisición y preparación inici
 - publicación en Kafka mediante `PublishKafkaRecord_2_0` y, cuando procede, aterrizaje complementario en HDFS
 - gestión de errores mediante colas de fallo y reintentos
 
+Para garantizar robustez ante picos de tráfico (`data spikes`), se ha configurado el mecanismo de `Back-Pressure` en las conexiones entre procesadores de NiFi. En concreto, se definió un `Back Pressure Object Threshold` de `10.000` objetos, de forma que el flujo se detenga automáticamente aguas arriba si Kafka o HDFS presentan latencia. Con ello se evita el desbordamiento de memoria y se protege la integridad de los eventos.
+
 Este diseño permite justificar tanto la trazabilidad de la ingesta como la separación entre dato bruto y dato preparado.
 
-**Capturas asociadas**:
-- canvas completo de NiFi con los procesadores conectados
-- configuración de `InvokeHTTP`
-- configuración de `PublishKafkaRecord_2_0` o del procesador equivalente utilizado
-- evidencia visual de flujo procesado correctamente en las colas `success`
+Las Figuras 4 a 10 documentan el canvas de NiFi, la configuración de `InvokeHTTP` y `PublishKafka`, y la ejecución correcta del flujo.
 
 ---
 
@@ -504,271 +518,6 @@ Elegir la opción `3) Dashboard solo (ultraligero)`.
 - GraphFrames: salida (rutas/riesgo).
 - Airflow: DAG + runs.
 
-### 9.1 Checklist exacto de evidencias operativas
-
-Capturas ya realizadas e incorporables a la memoria:
-- NiFi: canvas + `InvokeHTTP` + `PublishKafka`
-- Kafka: consumo correcto de `datos_filtrados`
-- Hive: `stg_weather_open_meteo`, `dim_ports_routes_weather`, `fact_weather_operational`
-- Hive alertas: `fact_alerts`
-- Cassandra: `vehicle_latest_state`
-- HDFS curated: listado de `fact_weather_operational`, `fact_route_risk`, `fact_graph_centrality`
-- GraphFrames: `fact_graph_centrality`
-- Airflow: lista de DAGs + Graph de `logistica_kdd_microbatch` + Graph de `logistica_kdd_monthly_retrain`
-- Rebuild tras reinicio validado: `scripts/66_rebuild_hive_demo_tables.sh` restaura dimensiones, staging y facts principales
-- Dashboard: `Control Tower Valladolid` simplificado, horizonte de 10 semanas industriales completo e ingesta con flota sobre mar
-- Dashboard: tabla de ETA con `Nombre de barco` y nombres reales de la flota demo
-- Dashboard: recuperación del bundle tras incidencia de HDFS `safe mode`
-
-Evidencias opcionales de refuerzo:
-- reintento o reejecución controlada de Airflow, si aporta valor adicional a la defensa
-
-Estado real al cierre de esta revisión:
-- La memoria ya cuenta con evidencia de arquitectura, Kafka `datos_crudos` y `datos_filtrados`, HDFS raw y curated, `spark-submit`, `SHOW TABLES IN logistica`, Airflow con run exitoso, capturas del dashboard actual y la captura conjunta de las tres terminales del flujo end-to-end.
-- No quedan pendientes reales de capturas obligatorias para la memoria.
-- El reintento de Airflow permanece como evidencia opcional de refuerzo.
-
-Tabla de cobertura real de capturas disponibles:
-
-| Evidencia | Estado | Archivo disponible |
-|---|---|---|
-| NiFi canvas completo | Cubierto | `Capturas de pantalla/04_Nifi_Canvas.png` |
-| NiFi en ejecución | Cubierto | `Capturas de pantalla/2Nifi_Vivo.png` |
-| Grupo o visión general de proceso NiFi | Cubierto | `Capturas de pantalla/03_NIFI_Grupo Proceso.png` |
-| Configuración `InvokeHTTP` | Cubierto | `Capturas de pantalla/05_Nifi_invokehttp.png` |
-| Configuración `PublishKafka` | Cubierto | `Capturas de pantalla/06_Nifi_publishKafka.png` |
-| Kafka topics | Cubierto | `Capturas de pantalla/07 Kafka_topics.png` |
-| Kafka `datos_filtrados` | Cubierto | `Capturas de pantalla/08_kafka_datos_filtrados_ok.png` |
-| Hive `stg_weather_open_meteo` | Cubierto | `Capturas de pantalla/09_Hive_stg_weather_open_meteo.png` |
-| Hive dimensiones maestras | Cubierto | `Capturas de pantalla/10_Hive_dimensiones_maestras.png` |
-| Hive `dim_ports_routes_weather` | Cubierto | `Capturas de pantalla/11_Hive_dim_ports_routes_weather.png` |
-| Hive `fact_weather_operational` | Cubierto | `Capturas de pantalla/12__hive_fact_weather_operational.png` |
-| Cassandra `vehicle_latest_state` | Cubierto | `Capturas de pantalla/13_cassandra_vehicle_lastest_state .png` |
-| Airflow lista de DAGs | Cubierto | `Capturas de pantalla/14_airflow_lista_dags.png` |
-| Airflow graph microbatch | Cubierto | `Capturas de pantalla/15_Airflow_microbatch_graph.png` |
-| Airflow graph monthly retrain | Cubierto | `Capturas de pantalla/16_Airflow_monthly_graph.png` |
-| HDFS curated | Cubierto | `Capturas de pantalla/17__hdfs_curated.png` |
-| Hive `fact_graph_centrality` | Cubierto | `Capturas de pantalla/18_hive_fact_graph_centrality.png` |
-| Hive `fact_alerts` | Cubierto | `Capturas de pantalla/19_Hive_fact_alerts.png` |
-| Hive `fact_air_recovery_options` | Cubierto | `Capturas de pantalla/20_evidencia de fact_air_recovery_option.png` |
-| Evidencia de envío mail | Cubierto | `Capturas de pantalla/21_prueba envio mail.png` |
-| Arranque de servicios base | Cubierto | `Capturas de pantalla/1levanta_kafka_airflow_nifi_postgres .png` |
-| Diagrama general de arquitectura final | Cubierto | `Capturas de pantalla/Diagrama General de Arquitectura.png` |
-| Kafka `datos_crudos` con evidencia visual | Cubierto | `Capturas de pantalla/23_KafkaDatosCrudos.png` o `Capturas de pantalla/23B_KafkaDatosCrudos.png` |
-| HDFS raw (`ships`, `clima`, `noticias`) | Cubierto | `Capturas de pantalla/24_hdfs_raw.png` |
-| Tres terminales del flujo end-to-end | Cubierto | `Capturas de pantalla/29_tres_terminales_end_to_end.png` |
-| `spark-submit` visible en ejecución | Cubierto | `Capturas de pantalla/26_spark_submit_staging.png.png` |
-| `SHOW TABLES IN logistica` | Cubierto | `Capturas de pantalla/27_show_tables_logistica.png.png` |
-| Airflow run exitoso | Cubierto | `Capturas de pantalla/28_airflow_run_exitoso.png` |
-| Airflow reintento o reejecución controlada | Opcional | No obligatorio para la entrega |
-| Dashboard actual `Control Tower Valladolid` | Cubierto | `Capturas de pantalla/30_dashboard_control_tower.png` |
-| Dashboard actual tabla ETA con nombres reales | Cubierto | `Capturas de pantalla/31_dashboard_eta_barcos.png.png` |
-| Dashboard actual vista de ingesta con barcos sobre mar | Cubierto | `Capturas de pantalla/31_dashboard_eta_barcos.png.png` |
-
-**Kafka**
-
-```bash
-docker compose exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
-docker compose exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --describe --topic datos_crudos
-docker compose exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --describe --topic datos_filtrados
-```
-
-Capturar:
-- topics visibles
-- detalle de `datos_crudos`
-- detalle de `datos_filtrados`
-
-**NiFi**
-- captura del canvas completo
-- captura de `InvokeHTTP`
-- captura de `PublishKafka`
-- referencia al export: `docs/nifi/OpenMeteo_Kafka_Flow.json`
-
-**HDFS**
-
-```bash
-docker compose exec -T namenode bash -lc '/opt/hadoop-3.2.1/bin/hdfs dfs -ls -R /hadoop/logistica/raw'
-docker compose exec -T namenode bash -lc '/opt/hadoop-3.2.1/bin/hdfs dfs -ls -R /hadoop/logistica/staging'
-docker compose exec -T namenode bash -lc '/opt/hadoop-3.2.1/bin/hdfs dfs -ls -R /hadoop/logistica/curated'
-docker compose exec -T namenode bash -lc '/opt/hadoop-3.2.1/bin/hdfs dfs -ls -R /hadoop/logistica/master'
-```
-
-Capturar al menos:
-- `stg_weather_open_meteo`
-- `dim_ports_routes_weather`
-- `fact_weather_operational`
-- `fact_route_risk`
-- `fact_graph_centrality`
-
-**Hive / Spark SQL**
-
-```bash
-docker compose exec -T spark spark-sql -e "SHOW TABLES IN logistica"
-docker compose exec -T spark spark-sql -e "SELECT * FROM logistica.stg_weather_open_meteo ORDER BY event_ts DESC LIMIT 5"
-docker compose exec -T spark spark-sql -e "SELECT * FROM logistica.dim_ports_routes_weather ORDER BY event_ts DESC LIMIT 5"
-docker compose exec -T spark spark-sql -e "SELECT * FROM logistica.fact_weather_operational ORDER BY event_ts DESC LIMIT 5"
-docker compose exec -T spark spark-sql -e "SELECT * FROM logistica.fact_alerts ORDER BY severity DESC LIMIT 5"
-docker compose exec -T spark spark-sql -e "SELECT * FROM logistica.fact_graph_centrality ORDER BY degree DESC LIMIT 5"
-```
-
-Comprobación tras reinicio del entorno:
-
-```bash
-bash scripts/66_rebuild_hive_demo_tables.sh
-docker compose exec -T spark bash -lc 'spark-sql -S -e "SHOW TABLES IN logistica" 2>/dev/null'
-```
-
-**Cassandra**
-
-```bash
-docker compose exec -T cassandra cqlsh -e "SELECT ship_id, route_id, dest_port, warehouse, stock_on_hand, reorder_point FROM logistica.vehicle_latest_state;"
-```
-
-Evidencia ya validada en sesión:
-- `ship-001 | route-shanghai-algeciras | Algeciras | Valladolid | 11 | 30`
-- `ship-002 | route-shanghai-valencia | Valencia | Valladolid | 93 | 30`
-- `ship-003 | route-shanghai-barcelona | Barcelona | Valladolid | 95 | 30`
-
-**Spark job clave en Docker**
-
-```bash
-bash scripts/63_run_weather_filtered_staging.sh full
-```
-
-Capturar:
-- terminal del `spark-submit`
-- tabla `logistica.stg_weather_open_meteo` despues del job
-
-**Airflow**
-- DAG `logistica_kdd_microbatch`
-- DAG `logistica_kdd_monthly_retrain`
-- vista Graph
-- un run exitoso
-- si es posible, un reintento
-
-### 9.2 Guion corto de demo final
-
-1. Mostrar NiFi recibiendo API pública y enviando a Kafka.
-2. Mostrar Kafka con `datos_crudos` y `datos_filtrados`.
-3. Mostrar Hive staging y dimensiones.
-4. Mostrar fact table operativa del clima.
-5. Mostrar grafo y criticidad de nodos.
-6. Mostrar Cassandra con `vehicle_latest_state`.
-7. Mostrar Airflow orquestando el flujo.
-
-### 9.3 Guion formal de defensa
-
-**Introducción**
-
-Este proyecto implementa una plataforma de datos orientada a logística marítima y portuaria. El objetivo principal es integrar datos operativos en tiempo casi real, combinarlos con información histórica y enriquecerlos con análisis de rutas para anticipar riesgos, priorizar acciones y mejorar la toma de decisiones.
-
-La propuesta sigue el ciclo KDD y cubre sus etapas principales: selección, preprocesamiento, transformación, minería e interpretación. La entrega final se defiende sobre una arquitectura Docker/local completamente funcional, con una estrategia de micro-batch documentado para reducir riesgo operativo durante la demo.
-
-**Arquitectura general**
-
-La arquitectura está compuesta por los siguientes bloques:
-
-- `Apache NiFi` para la ingesta desde una API pública real.
-- `Apache Kafka` como capa de mensajería, separando `datos_crudos` y `datos_filtrados`.
-- `HDFS` como almacenamiento distribuido para persistencia raw, staging y curated.
-- `Apache Hive` como capa SQL analítica sobre HDFS.
-- `Apache Spark` para limpieza, enriquecimiento, reglas de negocio, facts y grafos.
-- `GraphFrames` para el análisis de criticidad y estructura de la red logística.
-- `Apache Cassandra` para consultas de baja latencia sobre el último estado de vehículos.
-- `Apache Airflow` para la orquestación operativa y el refresco periódico.
-
-**Fase de ingesta y selección**
-
-La fase de ingesta se implementa con NiFi consumiendo una API pública meteorológica. Ese flujo publica dos salidas en Kafka:
-
-- `datos_crudos`, que conserva la respuesta original para trazabilidad.
-- `datos_filtrados`, que contiene un JSON simplificado y normalizado para analítica.
-
-Con esto se cubre la separación entre dato bruto y dato preparado, además de dejar evidencia reproducible mediante el export del flujo en `docs/nifi/OpenMeteo_Kafka_Flow.json`.
-
-**Fase de preprocesamiento y transformación**
-
-En Spark se construye una tabla de staging llamada `logistica.stg_weather_open_meteo`, que tipa, valida y normaliza el dato meteorológico recibido desde Kafka. Posteriormente se cargan dimensiones maestras reales en Hive:
-
-- `dim_ports`
-- `dim_routes`
-- `dim_warehouse`
-- `dim_skus`
-
-Estas dimensiones permiten reemplazar referencias embebidas y hacer joins más defendibles desde el punto de vista analítico.
-
-Después se genera `logistica.dim_ports_routes_weather`, que cruza el dato meteorológico con el contexto de puerto, ruta y almacén, calculando:
-
-- nivel de riesgo meteorológico
-- estado operativo del puerto
-- retraso estimado en horas
-
-**Fase de minería e interpretación**
-
-Sobre la capa enriquecida se construye `logistica.fact_weather_operational`, que representa la tabla operativa final del caso de clima. Esta tabla incluye:
-
-- riesgo operacional
-- retraso estimado
-- recomendación de acción
-- severidad operativa
-
-En paralelo, se mantiene el pipeline legacy basado en datos raw de barcos y alertas, que produce:
-
-- `logistica.fact_route_risk`
-- `logistica.fact_alerts`
-
-Esto permite demostrar una narrativa completa de alertas y priorización logística.
-
-**Análisis de grafos**
-
-La red logística se modela con GraphFrames, utilizando puertos y almacenes como nodos y rutas como aristas. Se han implementado dos métricas defendibles:
-
-- distancia o saltos entre nodos, persistida en `logistica.fact_graph_hops`
-- criticidad por grado, persistida en `logistica.fact_graph_centrality`
-
-Esto permite identificar nodos clave de la red, como Shanghai, Valladolid o Algeciras, y justificar decisiones operativas asociadas al cuello de botella o a la relevancia estructural del nodo.
-
-**Persistencia multicapa**
-
-La persistencia se divide según el caso de uso:
-
-- `Hive` se utiliza para staging, dimensiones y facts analíticas históricas.
-- `Cassandra` se utiliza para consultas rápidas sobre el último estado conocido de cada vehículo.
-
-La tabla `logistica.vehicle_latest_state` en Cassandra permite consultar directamente el último destino, almacén, stock y punto de reorden de cada barco, cubriendo el requisito de baja latencia.
-
-**Orquestación**
-
-La orquestación se resuelve con dos DAGs en Airflow:
-
-- `logistica_kdd_microbatch`, centrado en la ejecución operativa principal.
-- `logistica_kdd_monthly_retrain`, centrado en refresco de dimensiones, reconstrucción de grafos y limpieza de temporales.
-
-Además, se ha añadido visibilidad de fallos mediante `email_on_failure`, reforzando la parte operativa de la solución.
-
-**Decisiones de defensa y alcance**
-
-La decisión final para la defensa ha sido utilizar Docker/local como ruta oficial. Aunque existe trabajo de alineación conceptual con despliegues más distribuidos, la demo se apoya en un flujo estable y reproducible en local. Del mismo modo, Structured Streaming queda alineado a ventanas de `15 minutes`, pero la exposición principal se basa en micro-batch documentado para minimizar riesgo durante la presentación.
-
-**Limitaciones actuales**
-
-Las limitaciones principales del proyecto son:
-
-- la defensa no se realiza sobre VMs ni sobre YARN real en producción
-- el streaming real no es la ruta principal de demostración
-- algunas fuentes de negocio se han simplificado para hacer la demo más controlable
-- el bloque ML queda como evidencia técnica complementaria, no como núcleo de la defensa
-
-**Conclusión**
-
-En conjunto, el proyecto ya demuestra una cadena completa y funcional:
-
-NiFi -> Kafka -> HDFS/Hive -> Spark -> GraphFrames -> Cassandra -> Airflow
-
-La solución no solo ingiere y transforma datos, sino que también genera hechos analíticos, recomendaciones operativas, análisis de criticidad de red, consultas de baja latencia y una capa final de visualización ejecutiva en Streamlit. Esto permite defender el proyecto como una plataforma coherente de ingeniería de datos aplicada al dominio logístico.
-
----
-
 ## 10. Conclusiones
 
 El proyecto resuelve un problema real de visibilidad logística sobre la cadena marítima y terrestre, integrando datos operativos, riesgos externos y estado de stock en una plataforma unificada orientada a la toma de decisiones.
@@ -776,5 +525,7 @@ El proyecto resuelve un problema real de visibilidad logística sobre la cadena 
 Entre sus principales aportaciones destacan la trazabilidad del dato desde la ingesta hasta la visualización, la generación de facts analíticas defendibles, el uso de grafos para identificar nodos críticos y la incorporación de una capa operativa de contingencia capaz de comparar alternativas marítimas y aéreas.
 
 Las limitaciones actuales son conocidas y asumidas en la memoria: el streaming real no constituye la ruta principal de defensa, Cassandra se alimenta en la práctica mediante micro-batch, la entrega final no se apoya en un despliegue cluster/YARN y el envío SMTP real depende de una red con salida saliente habilitada.
+
+La arquitectura ha sido diseñada bajo principios de escalabilidad horizontal. Aunque la demostración actual se despliega sobre contenedores Docker, los artefactos de Spark y la configuración de HDFS son compatibles con su ejecución sobre un gestor de recursos `YARN` en modo clúster. Esto garantiza que la plataforma pueda escalar para procesar volúmenes masivos de datos logísticos sin requerir cambios en el código analítico.
 
 Como líneas de mejora futura, el proyecto puede ampliarse con mayor observabilidad, modelos predictivos más avanzados, automatización adicional en Airflow, integración con APIs de correo sobre HTTPS y una validación distribuida más completa sobre infraestructura multi-nodo.
