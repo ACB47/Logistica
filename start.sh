@@ -23,7 +23,6 @@ echo "     - HDFS + Hive"
 echo "     - Kafka (KRaft)"
 echo "     - Spark Master + Worker"
 echo "     - Cassandra"
-echo "     - Zeppelin"
 echo "     - Airflow"
 echo "     - NiFi"
 echo ""
@@ -32,7 +31,6 @@ echo "     - MinIO (取代 HDFS)"
 echo "     - Kafka (KRaft)"
 echo "     - Spark"
 echo "     - Cassandra"
-echo "     - Zeppelin"
 echo "     - Airflow"
 echo "     - NiFi"
 echo ""
@@ -56,7 +54,7 @@ case $opcion in
     2)
         echo ""
         echo "Iniciando modo SIMPLE..."
-        "${COMPOSE_CMD[@]}" -f docker-compose.simple.yml up -d
+        "${COMPOSE_CMD[@]}" -f docker-compose.simple.yml up -d kafka kafka-init postgres minio spark cassandra nifi airflow
         echo ""
         echo "=========================================="
         echo "SERVICIOS LEVANTADOS (SIMPLE)"
@@ -64,7 +62,6 @@ case $opcion in
         echo ""
         echo "Accesos web:"
         echo "  - Spark Master:  http://localhost:8080"
-        echo "  - Zeppelin:       http://localhost:8081"
         echo "  - Airflow:       http://localhost:8085 (admin/admin)"
         echo "  - NiFi:          https://localhost:8443"
         echo "  - MinIO Console: http://localhost:9001 (minioadmin/minioadmin)"
@@ -78,7 +75,7 @@ case $opcion in
     *)
         echo ""
         echo "Iniciando modo COMPLETO..."
-        "${COMPOSE_CMD[@]}" up -d
+        "${COMPOSE_CMD[@]}" up -d kafka kafka-init namenode datanode cassandra cassandra-init spark nifi postgres airflow-webserver
         echo ""
         echo "=========================================="
         echo "SERVICIOS LEVANTADOS (COMPLETO)"
@@ -87,7 +84,6 @@ case $opcion in
         echo "Accesos web:"
         echo "  - HDFS Namenode: http://localhost:9870"
         echo "  - Spark Master:  http://localhost:8080"
-        echo "  - Zeppelin:       http://localhost:8081"
         echo "  - Airflow:       http://localhost:8085 (admin/admin)"
         echo "  - NiFi:          https://localhost:8443"
         echo ""
